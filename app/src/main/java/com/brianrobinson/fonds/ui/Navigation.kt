@@ -19,6 +19,7 @@ import com.brianrobinson.fonds.ui.screens.CollectionScreen
 import com.brianrobinson.fonds.ui.screens.DocumentScreen
 import com.brianrobinson.fonds.ui.screens.FolderScreen
 import com.brianrobinson.fonds.ui.screens.HomeScreen
+import com.brianrobinson.fonds.ui.screens.InboxScreen
 import com.brianrobinson.fonds.ui.screens.SearchScreen
 import com.brianrobinson.fonds.ui.screens.SettingsScreen
 
@@ -31,6 +32,7 @@ object Routes {
     fun details(id: Long) = "details/$id"
     fun search(collectionId: Long = 0) = "search?cid=$collectionId"
     const val SETTINGS = "settings"
+    fun inbox(scan: Boolean = false) = "inbox?scan=$scan"
 }
 
 /** Thin wrapper so screens don't depend on NavController directly. */
@@ -93,5 +95,11 @@ fun FondsNavHost() {
             SearchScreen(nav, e.arguments!!.getLong("cid"))
         }
         composable(Routes.SETTINGS) { SettingsScreen(nav) }
+        composable(
+            "inbox?scan={scan}",
+            arguments = listOf(navArgument("scan") { type = NavType.BoolType; defaultValue = false }),
+        ) { e ->
+            InboxScreen(nav, e.arguments!!.getBoolean("scan"))
+        }
     }
 }

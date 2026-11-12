@@ -47,6 +47,8 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.MergeType
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Notes
@@ -60,6 +62,7 @@ import androidx.compose.material.icons.outlined.ShortText
 import androidx.compose.material.icons.outlined.TextSnippet
 import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -101,6 +104,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -111,6 +115,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.brianrobinson.fonds.LocalContainer
 import com.brianrobinson.fonds.ai.NanoState
+import android.content.Intent
+import com.brianrobinson.fonds.data.CollectionKind
 import com.brianrobinson.fonds.data.DocStatus
 import com.brianrobinson.fonds.data.DocumentContext
 import com.brianrobinson.fonds.data.DocumentEntity
@@ -161,8 +167,10 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
 
     val d = doc
+    val isSingle = ctx?.collectionKind == CollectionKind.INBOX
     val index = siblings.indexOfFirst { it.document.id == documentId }
     val prev = siblings.getOrNull(index - 1)
     val next = siblings.getOrNull(index + 1)
@@ -180,7 +188,11 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
                         Text(if (d != null) "Item ${d.sequence}" else "Item")
                         ctx?.let { cx ->
                             Text(
-                                "Box ${cx.boxNumber} · Folder ${cx.folderNumber} · ${cx.collectionTitle}",
+                                if (isSingle) {
+                                    "Single item" + (d?.sourceCollection?.takeIf { it.isNotBlank() }?.let { " · from $it" } ?: "")
+                                } else {
+                                    "Box ${cx.boxNumber} · Folder ${cx.folderNumber} · ${cx.collectionTitle}"
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -190,6 +202,19 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        enabled = d != null,
+                        onClick = {
+                            val dd = d ?: return@IconButton
+                            val text = shareText(dd, ctx, pages)
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, dd.title.ifBlank { "Archival item" })
+                                putExtra(Intent.EXTRA_TEXT, text)
+                            }
+                            context.startActivity(Intent.createChooser(send, "Share item"))
+                        },
+                    ) { Icon(Icons.Outlined.Share, "Share item") }
                     IconButton(onClick = { prev?.let { nav.replace(Routes.document(it.document.id)) } }, enabled = prev != null) {
                         Icon(Icons.Outlined.ChevronLeft, "Previous item")
                     }
@@ -244,8 +269,8 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("Move to another folder") },
-                                leadingIcon = { Icon(Icons.Outlined.DriveFileMove, null) },
+                                text = { Text(if (isSingle) "Add to a collection" else "Move to another folder or collection") },
+                                leadingIcon = { Icon(if (isSingle) Icons.Outlined.Inventory2 else Icons.Outlined.DriveFileMove, null) },
                                 onClick = { menu = false; moving = true },
                             )
                             HorizontalDivider()
@@ -300,6 +325,8 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
                 0 -> item {
                     DescribePane(
                         d, props,
+                        isSingle = isSingle,
+                        onAddToCollection = { moving = true },
                         nanoAvailable = nanoState == NanoState.AVAILABLE,
                         hasClaude = settings.hasClaude,
                         onField = { key, v -> launch { c.repo.saveDocumentField(documentId, key, v) } },
@@ -335,7 +362,7 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
                     }
                 }
                 else -> item {
-                    CitePane(d, ctx) { text ->
+                    CitePane(d, ctx, isSingle) { text ->
                         clipboard.setText(AnnotatedString(text))
                         scope.launch { snackbar.showSnackbar("Citation copied") }
                     }
@@ -385,21 +412,27 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
             )
         }
     }
-    if (moving) {
-        val cx = ctx
-        if (cx != null) {
-            MoveDialog(
-                initialBox = cx.boxNumber,
-                initialFolder = cx.folderNumber,
-                onDismiss = { moving = false },
-                onMove = { b, f ->
-                    launch {
-                        val target = c.repo.ensureFolder(cx.collectionId, b, f)
-                        c.repo.moveToFolder(documentId, target.id)
+    if (moving && d != null) {
+        AddToCollectionSheet(
+            docIds = listOf(documentId),
+            currentCollectionId = ctx?.collectionId,
+            isSingle = isSingle,
+            suggestedLocation = if (isSingle) d.sourceLocation else "",
+            onDismiss = { moving = false },
+            onDone = { result ->
+                moving = false
+                scope.launch {
+                    val r = snackbar.showSnackbar(
+                        result.message,
+                        actionLabel = if (result.folderId != null) "Open folder" else null,
+                        duration = androidx.compose.material3.SnackbarDuration.Long,
+                    )
+                    if (r == androidx.compose.material3.SnackbarResult.ActionPerformed && result.folderId != null) {
+                        nav.go(Routes.folder(result.folderId))
                     }
-                },
-            )
-        }
+                }
+            },
+        )
     }
 }
 
@@ -544,6 +577,8 @@ private fun StatusBanner(
 private fun DescribePane(
     d: DocumentEntity,
     props: Map<String, String>,
+    isSingle: Boolean,
+    onAddToCollection: () -> Unit,
     nanoAvailable: Boolean,
     hasClaude: Boolean,
     onField: (String, String) -> Unit,
@@ -556,6 +591,43 @@ private fun DescribePane(
     onRedraft: (String) -> Unit,
 ) {
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (isSingle) {
+            Surface(
+                color = Fonds.colors.labelPaper,
+                shape = MaterialTheme.shapes.large,
+                border = BorderStroke(1.dp, Fonds.colors.manilaEdge),
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionLabel("Where it's from", color = MaterialTheme.colorScheme.secondary)
+                    ProposalField(
+                        label = "Repository", value = d.sourceRepository, proposal = null,
+                        onSave = { onField(Fields.SOURCE_REPOSITORY, it) }, onAccept = {}, onDismiss = {},
+                        leading = Icons.Outlined.Business, capitalization = KeyboardCapitalization.Words,
+                    )
+                    ProposalField(
+                        label = "Collection", value = d.sourceCollection, proposal = null,
+                        onSave = { onField(Fields.SOURCE_COLLECTION, it) }, onAccept = {}, onDismiss = {},
+                        leading = Icons.Outlined.Inventory2, capitalization = KeyboardCapitalization.Words,
+                    )
+                    ProposalField(
+                        label = "Box / folder or call number", value = d.sourceLocation, proposal = null,
+                        onSave = { onField(Fields.SOURCE_LOCATION, it) }, onAccept = {}, onDismiss = {},
+                        leading = Icons.Outlined.Place, capitalization = KeyboardCapitalization.Words,
+                        placeholder = "e.g. Box 12, Folder 3",
+                    )
+                    Text(
+                        "Used in the citation. Filing it into a collection fills box and folder from here.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    FilledTonalButton(onClick = onAddToCollection, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Outlined.Inventory2, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add to a collection")
+                    }
+                }
+            }
+        }
         ProposalField(
             label = "Title", value = d.title, proposal = props[Fields.TITLE],
             onSave = { onField(Fields.TITLE, it) }, onAccept = { onAccept(Fields.TITLE) }, onDismiss = { onDismiss(Fields.TITLE) },
@@ -702,14 +774,18 @@ private fun PageTextCard(p: PageEntity, onSave: (String) -> Unit, onCopy: () -> 
 // ---------------------------------------------------------------- cite
 
 @Composable
-private fun CitePane(d: DocumentEntity, ctx: DocumentContext?, onCopy: (String) -> Unit) {
+private fun CitePane(d: DocumentEntity, ctx: DocumentContext?, isSingle: Boolean, onCopy: (String) -> Unit) {
     if (ctx == null) return
     val props = Proposals.parse(d.proposals)
     fun v(key: String) = d.field(key).ifBlank { props[key].orEmpty() }
     val title = v(Fields.TITLE).ifBlank { "Item ${d.sequence}" }
-    val full = Citations.note(v(Fields.CREATOR), v(Fields.RECIPIENT), title, v(Fields.DATE), ctx.boxNumber, ctx.folderNumber, ctx.collectionTitle, ctx.repository)
+    val full = if (isSingle) {
+        Citations.singleNote(v(Fields.CREATOR), v(Fields.RECIPIENT), title, v(Fields.DATE), d.sourceLocation, d.sourceCollection, d.sourceRepository)
+    } else {
+        Citations.note(v(Fields.CREATOR), v(Fields.RECIPIENT), title, v(Fields.DATE), ctx.boxNumber, ctx.folderNumber, ctx.collectionTitle, ctx.repository)
+    }
     val short = Citations.shortNote(v(Fields.CREATOR), v(Fields.RECIPIENT), title, v(Fields.DATE))
-    val bib = Citations.bibliography(ctx.collectionTitle, ctx.repository)
+    val bib = if (isSingle) Citations.bibliography(d.sourceCollection, d.sourceRepository) else Citations.bibliography(ctx.collectionTitle, ctx.repository)
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (!d.reviewed && props.isNotEmpty()) {
             Text(
@@ -720,8 +796,15 @@ private fun CitePane(d: DocumentEntity, ctx: DocumentContext?, onCopy: (String) 
         }
         CiteCard("Chicago note", full, onCopy)
         CiteCard("Short note", short, onCopy)
-        CiteCard("Bibliography", bib, onCopy)
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        if (bib != ".") CiteCard("Bibliography", bib, onCopy)
+        if (isSingle && d.sourceRepository.isBlank() && d.sourceCollection.isBlank() && d.sourceLocation.isBlank()) {
+            Text(
+                "Add where it's from on the Describe tab to complete the citation.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (!isSingle) Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.padding(12.dp)) {
                 SectionLabel("Location")
                 LocationLine("Collection", ctx.collectionTitle)
@@ -757,4 +840,34 @@ private fun LocationLine(label: String, value: String) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(96.dp))
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+private fun shareText(d: DocumentEntity, ctx: DocumentContext?, pages: List<PageEntity>): String {
+    val props = Proposals.parse(d.proposals)
+    fun v(key: String) = d.field(key).ifBlank { props[key].orEmpty() }
+    val single = ctx?.collectionKind == CollectionKind.INBOX
+    val title = v(Fields.TITLE).ifBlank { "Untitled item" }
+    val citation = if (single || ctx == null) {
+        Citations.singleNote(v(Fields.CREATOR), v(Fields.RECIPIENT), title, v(Fields.DATE), d.sourceLocation, d.sourceCollection, d.sourceRepository)
+    } else {
+        Citations.note(v(Fields.CREATOR), v(Fields.RECIPIENT), title, v(Fields.DATE), ctx.boxNumber, ctx.folderNumber, ctx.collectionTitle, ctx.repository)
+    }
+    return buildString {
+        appendLine(title)
+        listOf(v(Fields.DATE), v(Fields.TYPE)).filter { it.isNotBlank() }.joinToString(" · ").takeIf { it.isNotBlank() }?.let { appendLine(it) }
+        if (v(Fields.CREATOR).isNotBlank() || v(Fields.RECIPIENT).isNotBlank()) {
+            appendLine(listOf(v(Fields.CREATOR), v(Fields.RECIPIENT)).filter { it.isNotBlank() }.joinToString(" to "))
+        }
+        if (v(Fields.SUMMARY).isNotBlank()) { appendLine(); appendLine(v(Fields.SUMMARY)) }
+        listOf(Fields.PEOPLE to "People", Fields.PLACES to "Places", Fields.ORGS to "Organizations", Fields.SUBJECTS to "Subjects").forEach { (k, label) ->
+            if (v(k).isNotBlank()) appendLine("$label: ${v(k)}")
+        }
+        appendLine(); appendLine(citation)
+        if (!d.reviewed && props.isNotEmpty()) appendLine("(Description not yet reviewed.)")
+        val text = pages.filter { it.text.isNotBlank() }
+        if (text.isNotEmpty()) {
+            appendLine(); appendLine("Transcription")
+            text.forEach { p -> appendLine(); appendLine("[page ${p.sequence}]"); appendLine(p.text) }
+        }
+    }.trim()
 }

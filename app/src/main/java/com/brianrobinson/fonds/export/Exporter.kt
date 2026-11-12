@@ -461,7 +461,7 @@ class Exporter(private val repo: Repository, private val settings: Settings) {
         val header = listOf(
             "Box", "Folder", "Item", "Title", "Date", "Sortable date", "Type", "Creator", "Recipient", "Summary",
             "People", "Places", "Organizations", "Subjects", "Pages", "Handwritten", "Reviewed", "Drafted by",
-            "Processor note", "Citation", "Text",
+            "Processor note", "Source repository", "Source collection", "Source location", "Citation", "Text",
         )
         val rows = mutableListOf(header)
         d.folders.forEach { r ->
@@ -473,8 +473,12 @@ class Exporter(private val repo: Repository, private val settings: Settings) {
                     ri.creator, ri.recipient, ri.summary, ri.people.joinToString("; "), ri.places.joinToString("; "),
                     ri.organizations.joinToString("; "), ri.subjects.joinToString("; "), "${ri.pageCount}",
                     if (dr.document.handwritten) "yes" else "", if (dr.document.reviewed) "yes" else "no", dr.document.engine,
-                    dr.document.note,
-                    Citations.note(ri.creator, ri.recipient, ri.title, ri.date, r.boxNumber, r.folder.number, d.collection.title, d.collection.repository),
+                    dr.document.note, dr.document.sourceRepository, dr.document.sourceCollection, dr.document.sourceLocation,
+                    if (d.collection.kind == com.brianrobinson.fonds.data.CollectionKind.INBOX) {
+                        Citations.singleNote(ri.creator, ri.recipient, ri.title, ri.date, dr.document.sourceLocation, dr.document.sourceCollection, dr.document.sourceRepository)
+                    } else {
+                        Citations.note(ri.creator, ri.recipient, ri.title, ri.date, r.boxNumber, r.folder.number, d.collection.title, d.collection.repository)
+                    },
                     text,
                 )
             }
@@ -529,6 +533,7 @@ class Exporter(private val repo: Repository, private val settings: Settings) {
                                 put("organizations", JSONArray(ListField.split(doc.organizations))); put("subjects", JSONArray(ListField.split(doc.subjects)))
                                 put("handwritten", doc.handwritten); put("reviewed", doc.reviewed); put("draftedBy", doc.engine)
                                 put("note", doc.note); put("pendingDrafts", JSONObject(Proposals.parse(doc.proposals)))
+                                put("source", JSONObject().put("repository", doc.sourceRepository).put("collection", doc.sourceCollection).put("location", doc.sourceLocation))
                                 put("pages", JSONArray().apply {
                                     d.pagesByDoc[doc.id].orEmpty().forEach { p ->
                                         put(JSONObject().apply {
@@ -687,6 +692,17 @@ object Citations {
         val when_ = if (date.isBlank() || date.equals("undated", true)) "n.d." else naturalDate(date)
         return listOf(head, when_, "box $box, folder $folder", collection, repository)
             .filter { it.isNotBlank() }.joinToString(", ") + "."
+    }
+
+    /** For a single item: cite it by where it actually lives. */
+    fun singleNote(creator: String, recipient: String, title: String, date: String, location: String, collection: String, repository: String): String {
+        val head = when {
+            creator.isNotBlank() && recipient.isNotBlank() -> "$creator to $recipient"
+            title.isNotBlank() -> title
+            else -> "Untitled item"
+        }
+        val when_ = if (date.isBlank() || date.equals("undated", true)) "n.d." else naturalDate(date)
+        return listOf(head, when_, location, collection, repository).filter { it.isNotBlank() }.joinToString(", ") + "."
     }
 
     fun shortNote(creator: String, recipient: String, title: String, date: String): String {

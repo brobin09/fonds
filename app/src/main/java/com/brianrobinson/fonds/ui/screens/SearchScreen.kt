@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.brianrobinson.fonds.LocalContainer
+import com.brianrobinson.fonds.data.CollectionKind
 import com.brianrobinson.fonds.data.SearchHit
 import com.brianrobinson.fonds.data.displayDate
 import com.brianrobinson.fonds.data.displayTitle
@@ -175,8 +176,14 @@ private fun HitRow(hit: SearchHit, query: String, showCollection: Boolean, onCli
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    LocationBadge(hit.boxNumber, hit.folderNumber, d.sequence)
-                    if (showCollection) {
+                    if (hit.collectionKind == CollectionKind.INBOX) {
+                        Surface(color = Fonds.colors.manila, shape = MaterialTheme.shapes.extraSmall) {
+                            Text("Single item", style = MaterialTheme.typography.labelSmall, color = Fonds.colors.onManila, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    } else {
+                        LocationBadge(hit.boxNumber, hit.folderNumber, d.sequence)
+                    }
+                    if (showCollection && hit.collectionKind != CollectionKind.INBOX) {
                         Spacer(Modifier.width(6.dp))
                         Text(hit.collectionTitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }

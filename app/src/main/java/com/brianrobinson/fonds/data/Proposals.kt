@@ -16,6 +16,11 @@ object Fields {
     const val ORGS = "organizations"
     const val SUBJECTS = "subjects"
 
+    // where a single item came from
+    const val SOURCE_REPOSITORY = "sourceRepository"
+    const val SOURCE_COLLECTION = "sourceCollection"
+    const val SOURCE_LOCATION = "sourceLocation"
+
     // folder / series / collection
     const val SCOPE = "scopeNote"
     const val DATE_RANGE = "dateRange"
@@ -93,6 +98,9 @@ fun DocumentEntity.field(key: String): String = when (key) {
     Fields.PLACES -> places
     Fields.ORGS -> organizations
     Fields.SUBJECTS -> subjects
+    Fields.SOURCE_REPOSITORY -> sourceRepository
+    Fields.SOURCE_COLLECTION -> sourceCollection
+    Fields.SOURCE_LOCATION -> sourceLocation
     else -> ""
 }
 
@@ -108,6 +116,9 @@ fun DocumentEntity.withField(key: String, value: String): DocumentEntity = when 
     Fields.PLACES -> copy(places = value)
     Fields.ORGS -> copy(organizations = value)
     Fields.SUBJECTS -> copy(subjects = value)
+    Fields.SOURCE_REPOSITORY -> copy(sourceRepository = value)
+    Fields.SOURCE_COLLECTION -> copy(sourceCollection = value)
+    Fields.SOURCE_LOCATION -> copy(sourceLocation = value)
     else -> this
 }
 

@@ -34,11 +34,18 @@ data class CollectionEntity(
     val processingInfo: String = "",
     val proposals: String = "",
     val colorIndex: Int = 0,
+    /** "collection" for real collections; "inbox" for the hidden home of single items. */
+    val kind: String = CollectionKind.COLLECTION,
     val cursorBox: Int = 1,
     val cursorFolder: Int = 1,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
+
+object CollectionKind {
+    const val COLLECTION = "collection"
+    const val INBOX = "inbox"
+}
 
 @Entity(
     tableName = "boxes",
@@ -156,6 +163,10 @@ data class DocumentEntity(
     val organizations: String = "",
     val subjects: String = "",
     val note: String = "",
+    /** Where a single item came from (used for its citation until it joins a collection). */
+    val sourceRepository: String = "",
+    val sourceCollection: String = "",
+    val sourceLocation: String = "",
     val handwritten: Boolean = false,
     val status: String = DocStatus.QUEUED,
     val statusDetail: String = "",
@@ -237,6 +248,7 @@ data class SearchHit(
     val folderNumber: Int,
     val collectionId: Long,
     val collectionTitle: String,
+    val collectionKind: String,
     val matchText: String?,
 )
 
@@ -251,6 +263,7 @@ data class DocumentContext(
     val collectionId: Long,
     val collectionTitle: String,
     val repository: String,
+    val collectionKind: String,
 )
 
 data class FolderContext(

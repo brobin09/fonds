@@ -336,7 +336,12 @@ private fun rememberSaver(mime: String, onUri: (Uri) -> Unit): ManagedActivityRe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExportSheet(collection: CollectionEntity, onDismiss: () -> Unit, onSaved: (String) -> Unit) {
+fun ExportSheet(
+    collection: CollectionEntity,
+    onDismiss: () -> Unit,
+    onSaved: (String) -> Unit,
+    formats: List<ExportFormat> = ExportFormat.entries,
+) {
     val c = LocalContainer.current
     val settings by c.settings.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -382,7 +387,9 @@ fun ExportSheet(collection: CollectionEntity, onDismiss: () -> Unit, onSaved: (S
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            ToggleRow("Include item-level descriptions", settings.includeItemsInExport) { v -> c.settings.update { it.copy(includeItemsInExport = v) } }
+            if (ExportFormat.EAD in formats || ExportFormat.HTML in formats) {
+                ToggleRow("Include item-level descriptions", settings.includeItemsInExport) { v -> c.settings.update { it.copy(includeItemsInExport = v) } }
+            }
             ToggleRow("Include unreviewed drafts (marked)", settings.includeDraftsInExport) { v -> c.settings.update { it.copy(includeDraftsInExport = v) } }
             Spacer(Modifier.height(8.dp))
             if (busy != null) {
@@ -390,23 +397,35 @@ fun ExportSheet(collection: CollectionEntity, onDismiss: () -> Unit, onSaved: (S
                 Text("Preparing ${busy?.label}…", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(vertical = 6.dp))
             }
             failure?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 6.dp)) }
-            FormatRow(Icons.Outlined.Code, "EAD 2002 XML", "Standard encoded finding aid. Imports into ArchivesSpace and most catalogs.", busy == null) {
-                launchers.getValue(ExportFormat.EAD).launch(c.exporter.suggestedName(collection, ExportFormat.EAD))
+            if (ExportFormat.EAD in formats) {
+                FormatRow(Icons.Outlined.Code, "EAD 2002 XML", "Standard encoded finding aid. Imports into ArchivesSpace and most catalogs.", busy == null) {
+                    launchers.getValue(ExportFormat.EAD).launch(c.exporter.suggestedName(collection, ExportFormat.EAD))
+                }
             }
-            FormatRow(Icons.Outlined.Article, "Finding aid (HTML)", "A styled page to open in any browser, share or post.", busy == null) {
-                launchers.getValue(ExportFormat.HTML).launch(c.exporter.suggestedName(collection, ExportFormat.HTML))
+            if (ExportFormat.HTML in formats) {
+                FormatRow(Icons.Outlined.Article, "Finding aid (HTML)", "A styled page to open in any browser, share or post.", busy == null) {
+                    launchers.getValue(ExportFormat.HTML).launch(c.exporter.suggestedName(collection, ExportFormat.HTML))
+                }
             }
-            FormatRow(Icons.Outlined.TableChart, "Container list (CSV)", "Box, folder, title, dates and series. Opens in Sheets or Excel.", busy == null) {
-                launchers.getValue(ExportFormat.CONTAINER_CSV).launch(c.exporter.suggestedName(collection, ExportFormat.CONTAINER_CSV))
+            if (ExportFormat.CONTAINER_CSV in formats) {
+                FormatRow(Icons.Outlined.TableChart, "Container list (CSV)", "Box, folder, title, dates and series. Opens in Sheets or Excel.", busy == null) {
+                    launchers.getValue(ExportFormat.CONTAINER_CSV).launch(c.exporter.suggestedName(collection, ExportFormat.CONTAINER_CSV))
+                }
             }
-            FormatRow(Icons.Outlined.ViewList, "Item list (CSV)", "Every item with all fields, a Chicago citation and the full text.", busy == null) {
-                launchers.getValue(ExportFormat.ITEM_CSV).launch(c.exporter.suggestedName(collection, ExportFormat.ITEM_CSV))
+            if (ExportFormat.ITEM_CSV in formats) {
+                FormatRow(Icons.Outlined.ViewList, "Item list (CSV)", "Every item with all fields, a Chicago citation and the full text.", busy == null) {
+                    launchers.getValue(ExportFormat.ITEM_CSV).launch(c.exporter.suggestedName(collection, ExportFormat.ITEM_CSV))
+                }
             }
-            FormatRow(Icons.Outlined.DataObject, "Data (JSON)", "Everything Fonds knows, for other tools or your own scripts.", busy == null) {
-                launchers.getValue(ExportFormat.JSON).launch(c.exporter.suggestedName(collection, ExportFormat.JSON))
+            if (ExportFormat.JSON in formats) {
+                FormatRow(Icons.Outlined.DataObject, "Data (JSON)", "Everything Fonds knows, for other tools or your own scripts.", busy == null) {
+                    launchers.getValue(ExportFormat.JSON).launch(c.exporter.suggestedName(collection, ExportFormat.JSON))
+                }
             }
-            FormatRow(Icons.Outlined.FolderZip, "Complete package (ZIP)", "All of the above plus every page image and transcription. Use this as your backup.", busy == null) {
-                launchers.getValue(ExportFormat.ZIP).launch(c.exporter.suggestedName(collection, ExportFormat.ZIP))
+            if (ExportFormat.ZIP in formats) {
+                FormatRow(Icons.Outlined.FolderZip, "Complete package (ZIP)", "All of the above plus every page image and transcription. Use this as your backup.", busy == null) {
+                    launchers.getValue(ExportFormat.ZIP).launch(c.exporter.suggestedName(collection, ExportFormat.ZIP))
+                }
             }
         }
     }

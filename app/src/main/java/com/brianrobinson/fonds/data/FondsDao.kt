@@ -60,7 +60,7 @@ SELECT d.*,
  (SELECT COUNT(*) FROM pages p WHERE p.documentId = d.id) AS pageCount,
  (SELECT p2.imagePath FROM pages p2 WHERE p2.documentId = d.id ORDER BY p2.sequence LIMIT 1) AS thumbPath,
  b.number AS boxNumber, f.number AS folderNumber, b.collectionId AS collectionId,
- c.title AS collectionTitle,
+ c.title AS collectionTitle, c.kind AS collectionKind,
  (SELECT p3.text FROM pages p3 WHERE p3.documentId = d.id AND p3.text LIKE :q ORDER BY p3.sequence LIMIT 1) AS matchText
 FROM documents d
 JOIN folders f ON d.folderId = f.id
@@ -95,8 +95,17 @@ interface FondsDao {
     @Query("SELECT * FROM collections WHERE id = :id")
     fun collectionFlow(id: Long): Flow<CollectionEntity?>
 
-    @Query("$SUMMARY ORDER BY c.updatedAt DESC")
+    @Query("$SUMMARY WHERE c.kind = 'collection' ORDER BY c.updatedAt DESC")
     fun collectionSummaries(): Flow<List<CollectionSummary>>
+
+    @Query("$SUMMARY WHERE c.kind = 'inbox' LIMIT 1")
+    fun inboxSummary(): Flow<CollectionSummary?>
+
+    @Query("SELECT * FROM collections WHERE kind = 'inbox' LIMIT 1")
+    suspend fun findInbox(): CollectionEntity?
+
+    @Query("SELECT * FROM collections WHERE kind = 'collection' ORDER BY updatedAt DESC")
+    fun regularCollectionsFlow(): Flow<List<CollectionEntity>>
 
     @Query("$SUMMARY WHERE c.id = :id")
     fun collectionSummary(id: Long): Flow<CollectionSummary?>
@@ -230,6 +239,9 @@ interface FondsDao {
     @Query("$DOC_ROW WHERE b.collectionId = :collectionId ORDER BY b.number, f.number, d.sequence")
     suspend fun allDocumentRows(collectionId: Long): List<DocumentRow>
 
+    @Query("$DOC_ROW WHERE b.collectionId = :collectionId ORDER BY d.id DESC")
+    fun newestDocumentRows(collectionId: Long): Flow<List<DocumentRow>>
+
     @Query("SELECT COALESCE(MAX(sequence), 0) FROM documents WHERE folderId = :folderId")
     suspend fun maxDocSequence(folderId: Long): Int
 
@@ -257,7 +269,7 @@ interface FondsDao {
     @Query(
         """SELECT d.id AS documentId, f.id AS folderId, f.number AS folderNumber, f.label AS folderLabel,
            f.title AS folderTitle, b.id AS boxId, b.number AS boxNumber, c.id AS collectionId,
-           c.title AS collectionTitle, c.repository AS repository
+           c.title AS collectionTitle, c.repository AS repository, c.kind AS collectionKind
            FROM documents d JOIN folders f ON d.folderId = f.id JOIN boxes b ON f.boxId = b.id
            JOIN collections c ON b.collectionId = c.id WHERE d.id = :id""",
     )
@@ -266,7 +278,7 @@ interface FondsDao {
     @Query(
         """SELECT d.id AS documentId, f.id AS folderId, f.number AS folderNumber, f.label AS folderLabel,
            f.title AS folderTitle, b.id AS boxId, b.number AS boxNumber, c.id AS collectionId,
-           c.title AS collectionTitle, c.repository AS repository
+           c.title AS collectionTitle, c.repository AS repository, c.kind AS collectionKind
            FROM documents d JOIN folders f ON d.folderId = f.id JOIN boxes b ON f.boxId = b.id
            JOIN collections c ON b.collectionId = c.id WHERE d.id = :id""",
     )

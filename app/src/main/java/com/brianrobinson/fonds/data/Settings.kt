@@ -27,6 +27,9 @@ data class SettingsState(
     val includeDraftsInExport: Boolean = false,
     val includeItemsInExport: Boolean = true,
     val seenIntro: Boolean = false,
+    val lastSourceRepository: String = "",
+    val lastSourceCollection: String = "",
+    val lastSourceLocation: String = "",
 ) {
     val hasClaude: Boolean get() = claudeKey.isNotBlank()
 }
@@ -61,6 +64,9 @@ class Settings(context: Context) {
             includeDraftsInExport = prefs.getBoolean("includeDraftsInExport", d.includeDraftsInExport),
             includeItemsInExport = prefs.getBoolean("includeItemsInExport", d.includeItemsInExport),
             seenIntro = prefs.getBoolean("seenIntro", d.seenIntro),
+            lastSourceRepository = prefs.getString("lastSourceRepository", "") ?: "",
+            lastSourceCollection = prefs.getString("lastSourceCollection", "") ?: "",
+            lastSourceLocation = prefs.getString("lastSourceLocation", "") ?: "",
         )
     }
 
@@ -80,6 +86,9 @@ class Settings(context: Context) {
             .putBoolean("includeDraftsInExport", s.includeDraftsInExport)
             .putBoolean("includeItemsInExport", s.includeItemsInExport)
             .putBoolean("seenIntro", s.seenIntro)
+            .putString("lastSourceRepository", s.lastSourceRepository)
+            .putString("lastSourceCollection", s.lastSourceCollection)
+            .putString("lastSourceLocation", s.lastSourceLocation)
             .apply()
     }
 }

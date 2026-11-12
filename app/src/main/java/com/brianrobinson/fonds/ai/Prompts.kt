@@ -27,9 +27,19 @@ Return ONLY a JSON object with these keys:
         "Use only what the document itself shows. Never invent names, dates or facts. " +
             "Leave a field empty (\"\" or []) when the document does not show it."
 
-    fun item(collection: String, box: Int, folder: Int, folderLabel: String, text: String): String = """
+    /** One line telling the model where the item sits (collection + box/folder, or where a single item came from). */
+    fun context(collection: String, box: Int, folder: Int, folderLabel: String): String =
+        "Collection: $collection. Location: Box $box, Folder $folder" +
+            (if (folderLabel.isNotBlank()) " (\"$folderLabel\")" else "") + "."
+
+    fun singleContext(repository: String, collection: String, location: String): String {
+        val from = listOf(location, collection, repository).filter { it.isNotBlank() }.joinToString(", ")
+        return if (from.isBlank()) "This is a single item, not yet part of a collection." else "This is a single item from $from."
+    }
+
+    fun item(context: String, text: String): String = """
 You are an archivist writing item-level description for a finding aid.
-Collection: $collection. Location: Box $box, Folder $folder${if (folderLabel.isNotBlank()) " (\"$folderLabel\")" else ""}.
+$context
 $RULES
 
 $ITEM_SCHEMA
@@ -40,17 +50,17 @@ $text
 >>>
 """.trim()
 
-    fun itemFromImagesOnly(collection: String, box: Int, folder: Int, folderLabel: String): String = """
+    fun itemFromImagesOnly(context: String): String = """
 You are an archivist writing item-level description for a finding aid.
-Collection: $collection. Location: Box $box, Folder $folder${if (folderLabel.isNotBlank()) " (\"$folderLabel\")" else ""}.
+$context
 The attached image is the document. $RULES
 
 $ITEM_SCHEMA
 """.trim()
 
-    fun itemWithTranscription(collection: String, box: Int, folder: Int, folderLabel: String, pageCount: Int, ocrHint: String): String = """
+    fun itemWithTranscription(context: String, pageCount: Int, ocrHint: String): String = """
 You are an archivist transcribing and describing one archival item for a finding aid.
-Collection: $collection. Location: Box $box, Folder $folder${if (folderLabel.isNotBlank()) " (\"$folderLabel\")" else ""}.
+$context
 The $pageCount attached image(s) are the pages of the item, in order.
 First transcribe every page exactly as written: keep original spelling, capitalization, punctuation and line breaks. Mark unreadable words as [illegible]. Do not correct or modernize.
 Then describe the item. $RULES

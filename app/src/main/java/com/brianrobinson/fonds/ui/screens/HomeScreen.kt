@@ -28,6 +28,8 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -81,6 +83,8 @@ fun HomeScreen(nav: Nav) {
     val c = LocalContainer.current
     val flow = remember { c.repo.dao.collectionSummaries() }
     val collections by flow.collectAsStateWithLifecycle(initialValue = null)
+    val inboxFlow = remember { c.repo.dao.inboxSummary() }
+    val inbox by inboxFlow.collectAsStateWithLifecycle(initialValue = null)
     var showNew by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -110,7 +114,7 @@ fun HomeScreen(nav: Nav) {
             )
         },
         floatingActionButton = {
-            if (!collections.isNullOrEmpty()) {
+            if (!collections.isNullOrEmpty() || (inbox?.documentCount ?: 0) > 0) {
                 ExtendedFloatingActionButton(
                     onClick = { showNew = true },
                     icon = { Icon(Icons.Outlined.Add, null) },
@@ -121,19 +125,60 @@ fun HomeScreen(nav: Nav) {
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         val list = collections
+        val singles = inbox?.documentCount ?: 0
         when {
             list == null -> Box(Modifier.fillMaxSize().padding(padding))
-            list.isEmpty() -> Welcome(Modifier.padding(padding)) { showNew = true }
+            list.isEmpty() && singles == 0 -> Welcome(
+                Modifier.padding(padding),
+                onNew = { showNew = true },
+                onSingle = { nav.go(Routes.inbox(scan = true)) },
+            )
             else -> LazyColumn(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 4.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item { PipelineStrip() }
+                item {
+                    SingleItemsCard(
+                        inbox,
+                        onScan = { nav.go(Routes.inbox(scan = true)) },
+                        onOpen = { nav.go(Routes.inbox()) },
+                    )
+                }
+                item {
+                    Column(Modifier.padding(top = 8.dp)) {
+                        SectionLabel("Collections")
+                        Text(
+                            "Tap a collection to scan into it, review drafts, arrange series and see its finding aid.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (list.isEmpty()) {
+                    item {
+                        OutlinedCard(onClick = { showNew = true }, modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Add, null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("New collection", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "For a box or more of papers you want a finding aid for.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 items(list, key = { it.collection.id }) { s ->
                     CollectionCard(
                         s,
                         onOpen = { nav.go(Routes.collection(s.collection.id)) },
                         onResume = { nav.go(Routes.capture(s.collection.id)) },
+                        onFindingAid = { nav.go(Routes.collection(s.collection.id, 3)) },
                         modifier = Modifier.animateItem(),
                     )
                 }
@@ -154,7 +199,7 @@ fun HomeScreen(nav: Nav) {
 }
 
 @Composable
-private fun Welcome(modifier: Modifier, onStart: () -> Unit) {
+private fun Welcome(modifier: Modifier, onNew: () -> Unit, onSingle: () -> Unit) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
             EmptyState(
@@ -172,11 +217,21 @@ private fun Welcome(modifier: Modifier, onStart: () -> Unit) {
                 Step(3, Icons.Outlined.IosShare, "Review, arrange, export",
                     "Approve or fix each draft, group folders into series, then export EAD for ArchivesSpace, a printable finding aid, or spreadsheets.")
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Button(onClick = onNew, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                     Icon(Icons.Outlined.Add, null)
                     Spacer(Modifier.width(8.dp))
                     Text("New collection")
                 }
+                OutlinedButton(onClick = onSingle, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                    Icon(Icons.Outlined.DocumentScanner, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Scan a single item")
+                }
+                Text(
+                    "Single items are read and described the same way, and can join a collection later.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -204,7 +259,62 @@ private fun Step(n: Int, icon: ImageVector, title: String, body: String) {
 }
 
 @Composable
-private fun CollectionCard(s: CollectionSummary, onOpen: () -> Unit, onResume: () -> Unit, modifier: Modifier = Modifier) {
+private fun SingleItemsCard(inbox: CollectionSummary?, onScan: () -> Unit, onOpen: () -> Unit) {
+    val count = inbox?.documentCount ?: 0
+    OutlinedCard(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        colors = androidx.compose.material3.CardDefaults.outlinedCardColors(containerColor = Fonds.colors.labelPaper),
+        border = BorderStroke(1.dp, Fonds.colors.manilaEdge),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(color = Fonds.colors.manila, shape = CircleShape, modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.Description, null, tint = Fonds.colors.onManila, modifier = Modifier.size(22.dp))
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Single items", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        if (count == 0) {
+                            "One document, no collection needed"
+                        } else {
+                            val parts = buildList {
+                                add("$count item${if (count == 1) "" else "s"}")
+                                if (inbox != null && inbox.draftCount > 0) add("${inbox.draftCount} to review")
+                                if (inbox != null && inbox.busyCount > 0) add("${inbox.busyCount} processing")
+                            }
+                            parts.joinToString(" · ")
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (inbox?.thumbPath != null) Thumb(inbox.thumbPath, width = 40.dp, height = 52.dp)
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FilledTonalButton(onClick = onScan) {
+                    Icon(Icons.Outlined.DocumentScanner, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Scan an item")
+                }
+                if (count > 0) TextButton(onClick = onOpen) { Text("View all") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollectionCard(
+    s: CollectionSummary,
+    onOpen: () -> Unit,
+    onResume: () -> Unit,
+    onFindingAid: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val col = s.collection
     val band = Fonds.colors.collectionBands[col.colorIndex.mod(Fonds.colors.collectionBands.size)]
     OutlinedCard(
@@ -258,7 +368,11 @@ private fun CollectionCard(s: CollectionSummary, onOpen: () -> Unit, onResume: (
                         Spacer(Modifier.width(8.dp))
                         Text(if (s.documentCount == 0) "Start scanning" else "Resume · B${col.cursorBox} F${col.cursorFolder}")
                     }
-                    TextButton(onClick = onOpen) { Text("Open") }
+                    TextButton(onClick = onFindingAid) {
+                        Icon(Icons.Outlined.MenuBook, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Finding aid")
+                    }
                 }
             }
         }

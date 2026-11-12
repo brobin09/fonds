@@ -144,6 +144,63 @@ class Repository(
         return ids
     }
 
+    // ------------------------------------------------------------------ single items
+
+    /** The hidden collection that holds single items. Created the first time it's needed. */
+    suspend fun inbox(): CollectionEntity = db.withTransaction {
+        dao.findInbox() ?: CollectionEntity(title = "Single items", kind = CollectionKind.INBOX).let {
+            it.copy(id = dao.insertCollection(it))
+        }
+    }
+
+    suspend fun addSingleItems(
+        uris: List<Uri>,
+        handwritten: Boolean,
+        onePerPage: Boolean,
+        sourceRepository: String,
+        sourceCollection: String,
+        sourceLocation: String,
+    ): List<Long> {
+        val box = inbox()
+        val ids = addScan(box.id, 1, 1, uris, handwritten, onePerPage)
+        if (sourceRepository.isNotBlank() || sourceCollection.isNotBlank() || sourceLocation.isNotBlank()) {
+            db.withTransaction {
+                ids.forEach { id ->
+                    dao.getDocument(id)?.let { d ->
+                        dao.updateDocument(
+                            d.copy(
+                                sourceRepository = sourceRepository.trim(),
+                                sourceCollection = sourceCollection.trim(),
+                                sourceLocation = sourceLocation.trim(),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+        return ids
+    }
+
+    /**
+     * Files items into a collection at Box/Folder (creating either if needed), keeping their order.
+     * Works for single items and for moving items between collections.
+     */
+    suspend fun moveToCollection(docIds: List<Long>, collectionId: Long, box: Int, folder: Int, folderLabel: String = ""): Long {
+        val target = ensureFolder(collectionId, box, folder)
+        if (folderLabel.isNotBlank() && target.label.isBlank()) dao.updateFolder(target.copy(label = folderLabel.trim()))
+        db.withTransaction {
+            val docs = docIds.mapNotNull { dao.getDocument(it) }.sortedBy { it.id }
+            docs.forEach { moveToFolder(it.id, target.id) }
+            dao.touchCollection(collectionId, now())
+        }
+        return target.id
+    }
+
+    suspend fun moveToSingleItems(docIds: List<Long>) {
+        val inbox = inbox()
+        moveToCollection(docIds, inbox.id, 1, 1)
+    }
+
     // ------------------------------------------------------------------ documents
 
     suspend fun saveDocumentField(docId: Long, key: String, value: String) {
@@ -487,6 +544,15 @@ fun FolderEntity.withField(key: String, value: String): FolderEntity = when (key
     Fields.SCOPE -> copy(scopeNote = value)
     Fields.DATE_RANGE -> copy(dateRange = value)
     else -> this
+}
+
+/** Reads "Box 12, Folder 3", "B12 F3", "Bx. 12 / Fol. 3" and the like. */
+object LocationParse {
+    private val BOX = Regex("""(?i)\b(?:box|bx\.?|b)\s*#?\s*(\d{1,4})""")
+    private val FOLDER = Regex("""(?i)\b(?:folder|fol\.?|fldr\.?|f)\s*#?\s*(\d{1,4})""")
+
+    fun box(text: String): Int? = BOX.find(text)?.groupValues?.get(1)?.toIntOrNull()
+    fun folder(text: String): Int? = FOLDER.find(text)?.groupValues?.get(1)?.toIntOrNull()
 }
 
 object Dates {

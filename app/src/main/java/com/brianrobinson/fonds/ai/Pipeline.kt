@@ -1,5 +1,6 @@
 package com.brianrobinson.fonds.ai
 
+import com.brianrobinson.fonds.data.CollectionKind
 import com.brianrobinson.fonds.data.DocStatus
 import com.brianrobinson.fonds.data.DocumentContext
 import com.brianrobinson.fonds.data.DocumentEntity
@@ -103,8 +104,18 @@ class Pipeline(
 
     private fun now() = System.currentTimeMillis()
 
-    private fun where(ctx: DocumentContext?): String =
-        ctx?.let { "Box ${it.boxNumber} · Folder ${it.folderNumber}" }.orEmpty()
+    private fun where(ctx: DocumentContext?): String = when {
+        ctx == null -> ""
+        ctx.collectionKind == CollectionKind.INBOX -> "Single item"
+        else -> "Box ${ctx.boxNumber} · Folder ${ctx.folderNumber}"
+    }
+
+    private fun promptContext(ctx: DocumentContext, doc: DocumentEntity): String =
+        if (ctx.collectionKind == CollectionKind.INBOX) {
+            Prompts.singleContext(doc.sourceRepository, doc.sourceCollection, doc.sourceLocation)
+        } else {
+            Prompts.context(ctx.collectionTitle, ctx.boxNumber, ctx.folderNumber, ctx.folderLabel)
+        }
 
     private suspend fun readText(doc: DocumentEntity) {
         val ctx = dao.documentContextOnce(doc.id)
@@ -157,12 +168,12 @@ class Pipeline(
         val draft: ItemDraft = when (choice) {
             Engine.CLAUDE -> {
                 engineName = "Claude (${modelLabel(s.claudeModel)})"
-                describeWithClaude(s, ctx, doc, pages, text)
+                describeWithClaude(s, promptContext(ctx, doc), doc, pages, text)
             }
             Engine.NANO -> {
                 engineName = "Gemini Nano (on device)"
                 try {
-                    describeWithNano(ctx, pages, text)
+                    describeWithNano(promptContext(ctx, doc), pages, text)
                 } catch (c: CancellationException) {
                     throw c
                 } catch (t: Throwable) {
@@ -211,16 +222,16 @@ class Pipeline(
         }
     }
 
-    private suspend fun describeWithNano(ctx: DocumentContext, pages: List<PageEntity>, text: String): ItemDraft {
+    private suspend fun describeWithNano(context: String, pages: List<PageEntity>, text: String): ItemDraft {
         if (!nano.isAvailable) nano.refresh()
         if (!nano.isAvailable) throw IllegalStateException("Gemini Nano isn't ready on this phone yet. Check Settings.")
         awaitForeground()
         val clipped = text.take(NanoEngine.MAX_TEXT_CHARS)
         val raw = if (clipped.length < 120 && pages.isNotEmpty()) {
             val bmp = ImageStore.decodeScaled(pages.first().imagePath, 896)
-            nano.generate(Prompts.itemFromImagesOnly(ctx.collectionTitle, ctx.boxNumber, ctx.folderNumber, ctx.folderLabel), bmp)
+            nano.generate(Prompts.itemFromImagesOnly(context), bmp)
         } else {
-            nano.generate(Prompts.item(ctx.collectionTitle, ctx.boxNumber, ctx.folderNumber, ctx.folderLabel, clipped))
+            nano.generate(Prompts.item(context, clipped))
         }
         return DraftParser.parseItem(raw)
             ?: throw IllegalStateException("The on-device model didn't return a usable description.")
@@ -228,7 +239,7 @@ class Pipeline(
 
     private suspend fun describeWithClaude(
         s: SettingsState,
-        ctx: DocumentContext,
+        context: String,
         doc: DocumentEntity,
         pages: List<PageEntity>,
         text: String,
@@ -240,7 +251,7 @@ class Pipeline(
             claude.generate(
                 s.claudeKey,
                 s.claudeModel,
-                Prompts.itemWithTranscription(ctx.collectionTitle, ctx.boxNumber, ctx.folderNumber, ctx.folderLabel, images.size, text.take(4000)),
+                Prompts.itemWithTranscription(context, images.size, text.take(4000)),
                 images,
                 maxTokens = (1500 + 1500 * images.size).coerceAtMost(16_000),
             )
@@ -248,7 +259,7 @@ class Pipeline(
             claude.generate(
                 s.claudeKey,
                 s.claudeModel,
-                Prompts.item(ctx.collectionTitle, ctx.boxNumber, ctx.folderNumber, ctx.folderLabel, text.take(60_000)),
+                Prompts.item(context, text.take(60_000)),
                 images.take(2),
                 maxTokens = 1500,
             )
