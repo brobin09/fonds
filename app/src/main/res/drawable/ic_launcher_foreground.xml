@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- folder tab peeking out of the box -->
+    <path
+        android:fillColor="#E2C88E"
+        android:pathData="M40,30h12l3,4h13v8h-28z" />
+    <!-- box lid -->
+    <path
+        android:fillColor="#D9C08A"
+        android:pathData="M31,38h46v7h-46z" />
+    <!-- box body -->
+    <path
+        android:fillColor="#F1E2BE"
+        android:pathData="M33,45h42v31h-42z" />
+    <!-- label -->
+    <path
+        android:fillColor="#FFFDF8"
+        android:pathData="M44,52h20v13h-20z" />
+    <path
+        android:fillColor="#2E4A5A"
+        android:pathData="M47,56h14v2h-14z" />
+    <path
+        android:fillColor="#2E4A5A"
+        android:pathData="M47,60h9v2h-9z" />
+    <!-- hand hole -->
+    <path
+        android:fillColor="#8A6A2F"
+        android:pathData="M50,69h8v3h-8z" />
+</vector>

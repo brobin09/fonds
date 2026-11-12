@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="paper">#F5F1E8</color>
+    <color name="ink_dark">#15130F</color>
+    <color name="slate">#2E4A5A</color>
+    <color name="manila">#F1E2BE</color>
+
+    <style name="Theme.Fonds" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
