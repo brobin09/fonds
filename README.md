@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="96" alt="Fonds icon">
+
 # Fonds
 
 A phone app for turning boxes of archival papers into a finding aid. You scan by box and folder. The phone reads the text and drafts descriptions. You review the drafts, arrange folders into series and export EAD, HTML, CSV or a complete package.
@@ -6,8 +8,8 @@ Built for a Pixel. Everything runs on the phone unless you choose to send hard p
 
 ## Install on the Pixel
 
-1. On the phone, open **https://github.com/brobin09/fonds/releases/latest**
-2. Tap **fonds.apk** to download it, then open it.
+1. On the phone, open **https://github.com/brobin09/fonds/releases/latest/download/fonds.apk** (or the Releases page and tap **fonds.apk**).
+2. Open the downloaded file.
 3. If Android asks, allow your browser to install apps ("Install unknown apps").
 4. To update later, do the same thing. New builds install over the old one and keep your collections.
 
@@ -45,5 +47,7 @@ Scans, text and descriptions stay in the app's private storage on the phone. Gem
 ## Building
 
 GitHub Actions builds `fonds.apk` on every push to `main` and publishes it as the latest release. Locally: open in Android Studio, or `./gradlew assembleDebug`. The repo includes a fixed debug signing key so every build can update the previous install.
+
+The icon is generated from `tools/build_icon.py` (one source for the vectors and previews).
 
 Stack: Kotlin, Jetpack Compose (Material 3), Room, ML Kit Document Scanner, ML Kit Text Recognition, ML Kit GenAI Prompt API (Gemini Nano), Anthropic Messages API.
