@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -156,6 +157,7 @@ fun FolderScreen(nav: Nav, folderId: Long) {
         val props = Proposals.parse(f.proposals)
         val computed = Dates.range(r.minDate, r.maxDate)
         LazyColumn(
+            modifier = Modifier.imePadding(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 4.dp, bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

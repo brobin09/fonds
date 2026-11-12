@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,6 +66,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -171,12 +173,26 @@ fun CaptureScreen(nav: Nav, collectionId: Long, boxArg: Int, folderArg: Int) {
         (nums + folder).filter { it > 0 }.distinct().sorted()
     }
 
+    fun saveLabelNow() {
+        val b = box
+        val f = folder
+        val text = label
+        if (b > 0 && labelLoadedFor == Pair(b, f)) {
+            c.appScope.launch { c.repo.setFolderLabel(collectionId, b, f, text) }
+        }
+    }
+
     fun moveTo(newBox: Int, newFolder: Int) {
         focus.clearFocus()
+        saveLabelNow()
+        labelLoadedFor = Pair(-1, -1)
         box = newBox.coerceAtLeast(1)
         folder = newFolder.coerceAtLeast(1)
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
+
+    val saveOnLeave by rememberUpdatedState { saveLabelNow() }
+    DisposableEffect(Unit) { onDispose { saveOnLeave() } }
 
     val launchScan = rememberScanner(
         onPages = { uris ->
@@ -267,6 +283,7 @@ fun CaptureScreen(nav: Nav, collectionId: Long, boxArg: Int, folderArg: Int) {
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         LazyColumn(
+            modifier = Modifier.imePadding(),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
