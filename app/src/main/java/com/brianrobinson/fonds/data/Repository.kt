@@ -153,11 +153,72 @@ class Repository(
 
     suspend fun saveDocument(d: DocumentEntity) = dao.updateDocument(d.copy(updatedAt = now()))
 
+    /** Saves the display date and keeps the hidden sortable date in step with it. */
+    suspend fun saveDocumentDate(docId: Long, text: String) {
+        val d = dao.getDocument(docId) ?: return
+        dao.updateDocument(d.copy(date = text.trim(), dateSort = Dates.sortFromDacs(text), updatedAt = now()))
+    }
+
+    suspend fun saveFolderField(folderId: Long, key: String, value: String) {
+        val f = dao.getFolder(folderId) ?: return
+        val next = when (key) {
+            "label" -> f.copy(label = value.trim())
+            "note" -> f.copy(note = value)
+            else -> f.withField(key, value.trim())
+        }
+        if (next != f) dao.updateFolder(next)
+    }
+
+    suspend fun setFolderSeries(folderId: Long, seriesId: Long?) {
+        val f = dao.getFolder(folderId) ?: return
+        dao.updateFolder(f.copy(seriesId = seriesId))
+    }
+
+    suspend fun saveCollectionField(collectionId: Long, key: String, value: String) {
+        val c = dao.getCollection(collectionId) ?: return
+        val next = c.withAnyField(key, value)
+        if (next != c) dao.updateCollection(next.copy(updatedAt = now()))
+    }
+
+    suspend fun saveCollectionFields(edit: CollectionEntity) {
+        val cur = dao.getCollection(edit.id) ?: return
+        dao.updateCollection(
+            edit.copy(
+                proposals = cur.proposals,
+                cursorBox = cur.cursorBox,
+                cursorFolder = cur.cursorFolder,
+                colorIndex = cur.colorIndex,
+                updatedAt = now(),
+            ),
+        )
+    }
+
+    /** Add one suggested name/subject from a list proposal, leaving the rest pending. */
+    suspend fun acceptListItem(docId: Long, key: String, item: String) {
+        val d = dao.getDocument(docId) ?: return
+        val props = Proposals.parse(d.proposals).toMutableMap()
+        val current = ListField.split(d.field(key))
+        val next = d.withField(key, ListField.join(current + item))
+        val left = ListField.split(props[key].orEmpty()).filterNot { it.equals(item, ignoreCase = true) }
+        if (left.isEmpty()) props.remove(key) else props[key] = ListField.join(left)
+        dao.updateDocument(
+            next.copy(
+                proposals = Proposals.encode(props),
+                status = statusAfterReview(d.status, props),
+                updatedAt = now(),
+            ),
+        )
+    }
+
+    private fun DocumentEntity.mergedWith(key: String, value: String): DocumentEntity =
+        if (key in ListField.KEYS) withField(key, ListField.join(ListField.split(field(key)) + ListField.split(value)))
+        else withField(key, value)
+
     suspend fun acceptProposal(docId: Long, key: String) {
         val d = dao.getDocument(docId) ?: return
         val props = Proposals.parse(d.proposals)
         val v = props[key] ?: return
-        var next = d.withField(key, v)
+        var next = d.mergedWith(key, v)
         var remaining = props - key
         if (key == Fields.DATE) {
             props[Fields.DATE_SORT]?.let { next = next.withField(Fields.DATE_SORT, it) }
@@ -188,7 +249,7 @@ class Repository(
     suspend fun approveDocument(docId: Long) {
         val d = dao.getDocument(docId) ?: return
         var next = d
-        Proposals.parse(d.proposals).forEach { (k, v) -> next = next.withField(k, v) }
+        Proposals.parse(d.proposals).forEach { (k, v) -> next = next.mergedWith(k, v) }
         dao.updateDocument(
             next.copy(
                 proposals = "",
@@ -378,6 +439,49 @@ fun CollectionEntity.withField(key: String, value: String): CollectionEntity = w
     else -> this
 }
 
+object CollectionKeys {
+    const val TITLE = "title"
+    const val CREATOR = "creator"
+    const val REPOSITORY = "repository"
+    const val IDENTIFIER = "identifier"
+    const val BIOHIST = "bioHist"
+    const val ACCESS = "accessRestrict"
+    const val USE = "useRestrict"
+    const val CITATION = "preferredCitation"
+    const val PROCESSING = "processingInfo"
+}
+
+fun CollectionEntity.withAnyField(key: String, value: String): CollectionEntity = when (key) {
+    CollectionKeys.TITLE -> if (value.isBlank()) this else copy(title = value.trim())
+    CollectionKeys.CREATOR -> copy(creator = value.trim())
+    CollectionKeys.REPOSITORY -> copy(repository = value.trim())
+    CollectionKeys.IDENTIFIER -> copy(identifier = value.trim())
+    CollectionKeys.BIOHIST -> copy(bioHist = value)
+    CollectionKeys.ACCESS -> copy(accessRestrict = value)
+    CollectionKeys.USE -> copy(useRestrict = value)
+    CollectionKeys.CITATION -> copy(preferredCitation = value)
+    CollectionKeys.PROCESSING -> copy(processingInfo = value)
+    else -> withField(key, value)
+}
+
+fun CollectionEntity.anyField(key: String): String = when (key) {
+    CollectionKeys.TITLE -> title
+    CollectionKeys.CREATOR -> creator
+    CollectionKeys.REPOSITORY -> repository
+    CollectionKeys.IDENTIFIER -> identifier
+    CollectionKeys.BIOHIST -> bioHist
+    CollectionKeys.ACCESS -> accessRestrict
+    CollectionKeys.USE -> useRestrict
+    CollectionKeys.CITATION -> preferredCitation
+    CollectionKeys.PROCESSING -> processingInfo
+    Fields.ABSTRACT -> abstractText
+    Fields.SCOPE_CONTENT -> scopeContent
+    Fields.ARRANGEMENT -> arrangement
+    Fields.DATE_RANGE -> dateRange
+    Fields.EXTENT -> extent
+    else -> ""
+}
+
 fun FolderEntity.withField(key: String, value: String): FolderEntity = when (key) {
     Fields.TITLE -> copy(title = value)
     Fields.SCOPE -> copy(scopeNote = value)
@@ -386,6 +490,26 @@ fun FolderEntity.withField(key: String, value: String): FolderEntity = when (key
 }
 
 object Dates {
+    private val MONTHS = listOf(
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+    )
+    private val DACS = Regex("""^(?:circa\s+|ca\.\s*|c\.\s*)?(\d{4})(?:\s+([A-Za-z]+)\.?)?(?:\s+(\d{1,2}))?""", RegexOption.IGNORE_CASE)
+
+    /** "1952 January 5" → "1952-01-05"; "circa 1950" → "1950"; "" if it can't tell. */
+    fun sortFromDacs(text: String): String {
+        val m = DACS.find(text.trim()) ?: return ""
+        val y = m.groupValues[1]
+        val monthToken = m.groupValues[2].lowercase()
+        val mi = if (monthToken.length >= 3) MONTHS.indexOfFirst { it.startsWith(monthToken.take(3)) } + 1 else 0
+        if (mi == 0) return y
+        val day = m.groupValues[3].toIntOrNull()?.takeIf { it in 1..31 }
+        return buildString {
+            append(y).append("-%02d".format(mi))
+            if (day != null) append("-%02d".format(day))
+        }
+    }
+
     fun year(sort: String?): Int? = sort?.take(4)?.toIntOrNull()?.takeIf { it in 1000..2999 }
 
     /** DACS-style inclusive range from sortable dates: "1948-1952", "1952", or "". */
