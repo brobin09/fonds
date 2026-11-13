@@ -43,7 +43,7 @@
           ]
         }
       ],
-      "identity": null,
+      "identity": "-",
       "icon": "assets/icon.icns",
       "extendInfo": {
         "CFBundleDocumentTypes": [
@@ -56,7 +56,9 @@
             "LSHandlerRank": "Alternate"
           }
         ]
-      }
+      },
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "dmg": {
       "title": "FondsOS",
