@@ -28,7 +28,9 @@ jobs:
         run: npm run dist 2>&1 | tee build.log
       - name: Verify signature
         run: |
-          codesign --verify --deep --strict dist/mac-universal/FondsOS.app && echo signed-ok
+          set -e
+          codesign --verify --deep --strict dist/mac-universal/FondsOS.app
+          echo signed-ok
           codesign -dv dist/mac-universal/FondsOS.app 2>&1 | head -5
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -27,7 +27,8 @@
       "lib.js",
       "renderer/**",
       "package.json",
-      "assets/icon.png"
+      "assets/icon.png",
+      "adhoc-sign.js"
     ],
     "directories": {
       "buildResources": "assets",
@@ -43,7 +44,7 @@
           ]
         }
       ],
-      "identity": "-",
+      "identity": null,
       "icon": "assets/icon.icns",
       "extendInfo": {
         "CFBundleDocumentTypes": [
@@ -64,6 +65,7 @@
       "title": "FondsOS",
       "artifactName": "FondsOS.dmg",
       "icon": "assets/icon.icns"
-    }
+    },
+    "afterSign": "adhoc-sign.js"
   }
 }
