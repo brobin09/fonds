@@ -3,6 +3,7 @@ package com.brianrobinson.fonds.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -304,6 +305,11 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
             item {
                 PageViewer(pages, pager, Modifier.fillMaxWidth().height(360.dp)) { fullscreen = true }
             }
+            if (pages.size > 1) {
+                item {
+                    PageStrip(pages, pager.currentPage) { i -> scope.launch { pager.animateScrollToPage(i) } }
+                }
+            }
             item {
                 StatusBanner(
                     d,
@@ -459,6 +465,44 @@ private fun PageViewer(pages: List<PageEntity>, pager: PagerState, modifier: Mod
                 Surface(color = Color.Black.copy(alpha = 0.45f), contentColor = Color.White, shape = MaterialTheme.shapes.small) {
                     Icon(Icons.Outlined.Fullscreen, "View full screen", Modifier.padding(4.dp))
                 }
+            }
+        }
+    }
+}
+
+/** Thumbnails of every page; tap one to jump to it. */
+@Composable
+private fun PageStrip(pages: List<PageEntity>, current: Int, onPick: (Int) -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(pages.size) { i ->
+            val selected = i == current
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .size(width = 46.dp, height = 60.dp)
+                        .background(Fonds.colors.labelPaper, MaterialTheme.shapes.small)
+                        .border(
+                            if (selected) 2.5.dp else 1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            MaterialTheme.shapes.small,
+                        )
+                        .clickable { onPick(i) },
+                ) {
+                    AsyncImage(
+                        model = File(pages[i].imagePath),
+                        contentDescription = "Page ${i + 1}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().padding(2.dp),
+                    )
+                }
+                Text(
+                    "${i + 1}",
+                    style = LabelType.small,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

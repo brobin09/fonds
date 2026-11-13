@@ -91,6 +91,10 @@ import com.brianrobinson.fonds.ui.components.PipelineStrip
 import com.brianrobinson.fonds.ui.components.SectionLabel
 import com.brianrobinson.fonds.ui.components.StatusPill
 import com.brianrobinson.fonds.ui.components.Thumb
+import com.brianrobinson.fonds.ui.components.ItemTile
+import com.brianrobinson.fonds.ui.components.ViewToggle
+import com.brianrobinson.fonds.ui.components.galleryColumns
+import com.brianrobinson.fonds.ui.components.tileGrid
 import com.brianrobinson.fonds.ui.components.rememberScanner
 import com.brianrobinson.fonds.ui.theme.Fonds
 import kotlinx.coroutines.flow.flowOf
@@ -156,6 +160,7 @@ fun InboxScreen(nav: Nav, autoScan: Boolean) {
         selected.clear()
     }
 
+    val columns = galleryColumns()
     val toReview = rows.count { !it.document.reviewed && it.document.status in listOf(DocStatus.DRAFTED, DocStatus.DONE) }
 
     Scaffold(
@@ -185,6 +190,7 @@ fun InboxScreen(nav: Nav, autoScan: Boolean) {
                                 if (selected.size == rows.size) selected.clear() else { selected.clear(); selected.addAll(rows.map { it.document.id }) }
                             }) { Text(if (selected.size == rows.size) "None" else "All") }
                         } else {
+                            ViewToggle(settings.galleryView) { c.settings.update { it.copy(galleryView = !it.galleryView) } }
                             TextButton(onClick = { selecting = true }) { Text("Select") }
                             IconButton(onClick = { exporting = true }) { Icon(Icons.Outlined.FileDownload, "Export single items") }
                         }
@@ -287,7 +293,28 @@ fun InboxScreen(nav: Nav, autoScan: Boolean) {
                 item {
                     SectionLabel(if (selecting) "Tap items to select them" else "Newest first · long-press to select")
                 }
-                items(rows, key = { it.document.id }) { row ->
+                if (settings.galleryView) {
+                    tileGrid(rows, columns, "in") { row, m ->
+                        val id = row.document.id
+                        ItemTile(
+                            row, m,
+                            caption = listOf(row.document.displayDate(), row.document.sourceCollection).filter { it.isNotBlank() }.joinToString(" · "),
+                            selecting = selecting,
+                            selected = id in selected,
+                            onClick = {
+                                if (selecting) {
+                                    if (id in selected) selected.remove(id) else selected.add(id)
+                                } else {
+                                    nav.go(Routes.document(id))
+                                }
+                            },
+                            onLongClick = {
+                                selecting = true
+                                if (id !in selected) selected.add(id)
+                            },
+                        )
+                    }
+                } else items(rows, key = { it.document.id }) { row ->
                     InboxRow(
                         row = row,
                         selecting = selecting,

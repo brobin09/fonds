@@ -31,6 +31,8 @@ data class SettingsState(
     val lastSourceCollection: String = "",
     val lastSourceLocation: String = "",
     val nanoLimitFixApplied: Boolean = false,
+    /** List or gallery for items, remembered across screens. */
+    val galleryView: Boolean = false,
 ) {
     val hasClaude: Boolean get() = claudeKey.isNotBlank()
 }
@@ -69,6 +71,7 @@ class Settings(context: Context) {
             lastSourceCollection = prefs.getString("lastSourceCollection", "") ?: "",
             lastSourceLocation = prefs.getString("lastSourceLocation", "") ?: "",
             nanoLimitFixApplied = prefs.getBoolean("nanoLimitFixApplied", false),
+            galleryView = prefs.getBoolean("galleryView", false),
         )
     }
 
@@ -92,6 +95,7 @@ class Settings(context: Context) {
             .putString("lastSourceCollection", s.lastSourceCollection)
             .putString("lastSourceLocation", s.lastSourceLocation)
             .putBoolean("nanoLimitFixApplied", s.nanoLimitFixApplied)
+            .putBoolean("galleryView", s.galleryView)
             .apply()
     }
 }

@@ -86,6 +86,10 @@ import com.brianrobinson.fonds.ui.components.ProposalField
 import com.brianrobinson.fonds.ui.components.SectionLabel
 import com.brianrobinson.fonds.ui.components.StatusPill
 import com.brianrobinson.fonds.ui.components.Thumb
+import com.brianrobinson.fonds.ui.components.ItemTile
+import com.brianrobinson.fonds.ui.components.ViewToggle
+import com.brianrobinson.fonds.ui.components.galleryColumns
+import com.brianrobinson.fonds.ui.components.tileGrid
 import com.brianrobinson.fonds.ui.theme.Fonds
 import com.brianrobinson.fonds.ui.theme.LabelType
 import kotlinx.coroutines.flow.flowOf
@@ -103,6 +107,8 @@ fun FolderScreen(nav: Nav, folderId: Long) {
     val seriesFlow = remember(collectionId) { collectionId?.let { c.repo.dao.seriesFlow(it) } ?: flowOf(emptyList()) }
     val series by seriesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
+    val settings by c.settings.state.collectAsStateWithLifecycle()
+    val gallery = settings.galleryView
     var reorder by remember { mutableStateOf(false) }
     var drafting by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -130,6 +136,10 @@ fun FolderScreen(nav: Nav, folderId: Long) {
                     }
                 },
                 actions = {
+                    ViewToggle(gallery) {
+                        reorder = false
+                        c.settings.update { it.copy(galleryView = !it.galleryView) }
+                    }
                     if (r != null) {
                         IconButton(onClick = { nav.go(Routes.capture(r.collectionId, r.boxNumber, r.folder.number)) }) {
                             Icon(Icons.Outlined.DocumentScanner, "Scan into this folder")
@@ -156,6 +166,7 @@ fun FolderScreen(nav: Nav, folderId: Long) {
         val f = r.folder
         val props = Proposals.parse(f.proposals)
         val computed = Dates.range(r.minDate, r.maxDate)
+        val columns = galleryColumns()
         LazyColumn(
             modifier = Modifier.imePadding(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 4.dp, bottom = 40.dp),
@@ -262,11 +273,19 @@ fun FolderScreen(nav: Nav, folderId: Long) {
                             Text("Approve ${r.draftCount}")
                         }
                     }
-                    FilterChip(selected = reorder, onClick = { reorder = !reorder }, label = { Text("Arrange") })
+                    if (!gallery) FilterChip(selected = reorder, onClick = { reorder = !reorder }, label = { Text("Arrange") })
                 }
             }
 
-            itemsIndexed(docs, key = { _, d -> d.document.id }) { i, d ->
+            if (gallery) {
+                tileGrid(docs, columns, "g") { d, m ->
+                    ItemTile(
+                        d, m,
+                        caption = listOf("#${d.document.sequence}", d.document.displayDate()).filter { it.isNotBlank() }.joinToString(" · "),
+                        onClick = { nav.go(Routes.document(d.document.id)) },
+                    )
+                }
+            } else itemsIndexed(docs, key = { _, d -> d.document.id }) { i, d ->
                 FolderItemRow(
                     d,
                     reorder = reorder,

@@ -242,6 +242,9 @@ interface FondsDao {
     @Query("$DOC_ROW WHERE b.collectionId = :collectionId ORDER BY d.id DESC")
     fun newestDocumentRows(collectionId: Long): Flow<List<DocumentRow>>
 
+    @Query("$DOC_ROW WHERE b.collectionId = :collectionId ORDER BY b.number, f.number, d.sequence")
+    fun documentRowsFlow(collectionId: Long): Flow<List<DocumentRow>>
+
     @Query("SELECT COALESCE(MAX(sequence), 0) FROM documents WHERE folderId = :folderId")
     suspend fun maxDocSequence(folderId: Long): Int
 

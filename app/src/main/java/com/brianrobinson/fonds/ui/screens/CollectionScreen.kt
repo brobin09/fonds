@@ -72,6 +72,11 @@ import com.brianrobinson.fonds.ui.components.FolderTab
 import com.brianrobinson.fonds.ui.components.PipelineStrip
 import com.brianrobinson.fonds.ui.components.SectionLabel
 import com.brianrobinson.fonds.ui.components.StatTile
+import com.brianrobinson.fonds.ui.components.ItemTile
+import com.brianrobinson.fonds.ui.components.ViewToggle
+import com.brianrobinson.fonds.ui.components.galleryColumns
+import com.brianrobinson.fonds.ui.components.tileGrid
+import com.brianrobinson.fonds.data.displayDate
 import com.brianrobinson.fonds.ui.theme.Fonds
 import com.brianrobinson.fonds.ui.theme.LabelType
 import kotlinx.coroutines.launch
@@ -83,6 +88,7 @@ fun CollectionScreen(nav: Nav, collectionId: Long, initialTab: Int) {
     val summaryFlow = remember { c.repo.dao.collectionSummary(collectionId) }
     val summary by summaryFlow.collectAsStateWithLifecycle(initialValue = null)
     var tab by rememberSaveable { mutableIntStateOf(initialTab) }
+    val settings by c.settings.state.collectAsStateWithLifecycle()
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -106,6 +112,9 @@ fun CollectionScreen(nav: Nav, collectionId: Long, initialTab: Int) {
                         }
                     },
                     actions = {
+                        if (tab == 0) {
+                            ViewToggle(settings.galleryView) { c.settings.update { it.copy(galleryView = !it.galleryView) } }
+                        }
                         IconButton(onClick = { nav.go(Routes.search(collectionId)) }) { Icon(Icons.Outlined.Search, "Search this collection") }
                         IconButton(onClick = { nav.go(Routes.details(collectionId)) }) { Icon(Icons.Outlined.Info, "Collection details") }
                         Box {
@@ -155,7 +164,7 @@ fun CollectionScreen(nav: Nav, collectionId: Long, initialTab: Int) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (tab) {
-                0 -> BoxesTab(collectionId, s, nav)
+                0 -> if (settings.galleryView) BoxesGallery(collectionId, nav) else BoxesTab(collectionId, s, nav)
                 1 -> SeriesTab(collectionId, nav)
                 2 -> ReviewTab(collectionId, nav)
                 else -> FindingAidTab(collectionId, nav)
@@ -237,6 +246,75 @@ private fun BoxesTab(collectionId: Long, s: CollectionSummary?, nav: Nav) {
             }
             items(rows, key = { it.folder.id }) { row ->
                 FolderCard(row, Modifier.animateItem()) { nav.go(Routes.folder(row.folder.id)) }
+            }
+        }
+    }
+}
+
+/** Every item in the collection as tiles, grouped under its box and folder. */
+@Composable
+private fun BoxesGallery(collectionId: Long, nav: Nav) {
+    val c = LocalContainer.current
+    val foldersFlow = remember { c.repo.dao.folderRows(collectionId) }
+    val folders by foldersFlow.collectAsStateWithLifecycle(initialValue = null)
+    val docsFlow = remember { c.repo.dao.documentRowsFlow(collectionId) }
+    val docs by docsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val list = folders ?: return
+    if (list.isEmpty()) {
+        EmptyState(
+            icon = Icons.Outlined.Inventory2,
+            title = "No boxes yet",
+            body = "Start with Box 1, Folder 1. Each scan is filed in the folder you set on the capture screen.",
+            actionLabel = "Start scanning",
+            onAction = { nav.go(Routes.capture(collectionId, 1, 1)) },
+        )
+        return
+    }
+    val byFolder = docs.groupBy { it.document.folderId }
+    val columns = galleryColumns()
+    LazyColumn(
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item { PipelineStrip() }
+        list.forEach { row ->
+            val items = byFolder[row.folder.id].orEmpty()
+            item(key = "fh-${row.folder.id}") {
+                Surface(
+                    onClick = { nav.go(Routes.folder(row.folder.id)) },
+                    color = androidx.compose.ui.graphics.Color.Transparent,
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = Fonds.colors.labelPaper,
+                            shape = MaterialTheme.shapes.extraSmall,
+                            border = BorderStroke(1.dp, Fonds.colors.manilaEdge),
+                        ) {
+                            Text("B${row.boxNumber} · F${row.folder.number}", style = LabelType.small, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        val title = row.folder.displayTitle()
+                        Text(
+                            title.ifBlank { "Untitled folder" },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontStyle = if (row.folder.titleIsDraft() || title.isBlank()) FontStyle.Italic else FontStyle.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text("${items.size}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (items.isEmpty()) {
+                item(key = "fe-${row.folder.id}") {
+                    Text("No items yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                }
+            } else {
+                tileGrid(items, columns, "f${row.folder.id}") { r, m ->
+                    ItemTile(r, m, caption = r.document.displayDate(), onClick = { nav.go(Routes.document(r.document.id)) })
+                }
             }
         }
     }
