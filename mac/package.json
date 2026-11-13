@@ -21,7 +21,7 @@
   "build": {
     "appId": "com.brianrobinson.fonds.mac",
     "productName": "Fonds",
-    "files": ["main.js", "preload.js", "lib.js", "renderer/**", "package.json"],
+    "files": ["main.js", "preload.js", "lib.js", "renderer/**", "build/icon.png", "package.json"],
     "directories": { "buildResources": "build", "output": "dist" },
     "mac": {
       "category": "public.app-category.productivity",
