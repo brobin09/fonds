@@ -1,0 +1,39 @@
+{
+  "name": "fonds-for-mac",
+  "productName": "Fonds",
+  "version": "1.0.0",
+  "description": "Companion for the Fonds Android archive scanner: open export packages, browse, edit and print finding aids.",
+  "main": "main.js",
+  "author": "Brian Robinson",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/test.js",
+    "dist": "electron-builder --mac dmg --universal --publish never"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.brianrobinson.fonds.mac",
+    "productName": "Fonds",
+    "files": ["main.js", "preload.js", "lib.js", "renderer/**", "package.json"],
+    "directories": { "buildResources": "build", "output": "dist" },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "identity": null,
+      "icon": "build/icon.png",
+      "extendInfo": {
+        "CFBundleDocumentTypes": [
+          { "CFBundleTypeName": "Fonds package", "CFBundleTypeExtension": ["zip"], "CFBundleTypeRole": "Viewer", "LSHandlerRank": "Alternate" }
+        ]
+      }
+    },
+    "dmg": { "title": "Fonds", "artifactName": "Fonds-mac.dmg" }
+  }
+}

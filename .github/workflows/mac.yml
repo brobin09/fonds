@@ -1,0 +1,52 @@
+name: Build Mac app
+
+on:
+  push:
+    branches: [main]
+    paths: ["mac/**", ".github/workflows/mac.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Test
+        run: npm test
+      - name: Build DMG (universal, unsigned)
+        run: npm run dist 2>&1 | tee build.log
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fonds-mac
+          path: mac/dist/Fonds-mac.dmg
+      - name: Publish release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "mac-${{ github.run_number }}" dist/Fonds-mac.dmg \
+            --title "Fonds for Mac #${{ github.run_number }}" --notes "Unsigned. First launch: right-click Fonds → Open (or run: xattr -cr /Applications/Fonds.app)." --latest=false
+      - name: Push log on failure
+        if: failure()
+        run: |
+          cp build.log /tmp/mac-build.log 2>/dev/null || echo "no log" > /tmp/mac-build.log
+          cd "$GITHUB_WORKSPACE"
+          git config user.name ci; git config user.email ci@example.com
+          git checkout --orphan mac-logs
+          git rm -rf . >/dev/null 2>&1 || true
+          cp /tmp/mac-build.log mac-build.log
+          git add mac-build.log
+          git commit -m "mac build log"
+          git push -f origin mac-logs:ci-logs-mac

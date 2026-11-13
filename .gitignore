@@ -7,3 +7,6 @@ local.properties
 .DS_Store
 captures/
 .kotlin/
+mac/node_modules/
+mac/dist/
+mac/build.log
