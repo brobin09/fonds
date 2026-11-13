@@ -167,8 +167,48 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
     var moving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    var pendingPage by remember { mutableStateOf<PageEntity?>(null) }
+    val savePageLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("image/jpeg"),
+    ) { uri ->
+        val p = pendingPage
+        if (uri != null && p != null) scope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    File(p.imagePath).inputStream().use { input ->
+                        context.contentResolver.openOutputStream(uri)!!.use { out -> input.copyTo(out) }
+                    }
+                }.isSuccess
+            }
+            snackbar.showSnackbar(if (ok) "Saved page ${p.sequence}" else "Couldn't save the image")
+        }
+    }
+    val savePagesZip = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val list = pages
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)!!.use { os ->
+                        java.util.zip.ZipOutputStream(os).use { z ->
+                            list.forEach { p ->
+                                val f = File(p.imagePath)
+                                if (f.exists()) {
+                                    z.putNextEntry(java.util.zip.ZipEntry("page-%02d.jpg".format(p.sequence)))
+                                    f.inputStream().use { it.copyTo(z) }
+                                    z.closeEntry()
+                                }
+                            }
+                        }
+                    }
+                }.isSuccess
+            }
+            snackbar.showSnackbar(if (ok) "Saved ${list.size} page images" else "Couldn't save the images")
+        }
+    }
+    val clipboard = LocalClipboardManager.current
 
     val d = doc
     val isSingle = ctx?.collectionKind == CollectionKind.INBOX
@@ -247,6 +287,21 @@ fun DocumentScreen(nav: Nav, documentId: Long) {
                                 leadingIcon = { Icon(Icons.Outlined.Refresh, null) },
                                 onClick = { menu = false; launch { c.repo.rereadText(documentId); c.pipeline.kick() } },
                             )
+                            DropdownMenuItem(
+                                text = { Text("Save this page as image") },
+                                leadingIcon = { Icon(Icons.Outlined.Share, null) },
+                                onClick = {
+                                    menu = false
+                                    pages.getOrNull(pager.currentPage)?.let { pendingPage = it; savePageLauncher.launch("page-%02d.jpg".format(it.sequence)) }
+                                },
+                            )
+                            if (pages.size > 1) {
+                                DropdownMenuItem(
+                                    text = { Text("Save all ${pages.size} pages (ZIP)") },
+                                    leadingIcon = { Icon(Icons.Outlined.Share, null) },
+                                    onClick = { menu = false; savePagesZip.launch("item-pages.zip") },
+                                )
+                            }
                             HorizontalDivider()
                             if (pages.size > 1 && pager.currentPage > 0) {
                                 DropdownMenuItem(

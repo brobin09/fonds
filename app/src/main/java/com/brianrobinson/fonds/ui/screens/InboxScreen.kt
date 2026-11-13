@@ -372,7 +372,7 @@ fun InboxScreen(nav: Nav, autoScan: Boolean) {
         inbox?.let { col ->
             ExportSheet(
                 collection = col,
-                formats = listOf(ExportFormat.ITEM_CSV, ExportFormat.JSON, ExportFormat.ZIP),
+                formats = listOf(ExportFormat.IMAGES, ExportFormat.ITEM_CSV, ExportFormat.JSON, ExportFormat.ZIP),
                 onDismiss = { exporting = false },
                 onSaved = { msg ->
                     exporting = false

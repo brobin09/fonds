@@ -69,6 +69,7 @@ enum class ExportFormat(val label: String, val mime: String, val ext: String) {
     ITEM_CSV("Item list (CSV)", "text/csv", "csv"),
     JSON("Data (JSON)", "application/json", "json"),
     ZIP("Complete package (ZIP)", "application/zip", "zip"),
+    IMAGES("Page images only (ZIP)", "application/zip", "zip"),
 }
 
 class Exporter(private val repo: Repository, private val settings: Settings) {
@@ -99,6 +100,7 @@ class Exporter(private val repo: Repository, private val settings: Settings) {
             ExportFormat.ITEM_CSV -> "items"
             ExportFormat.JSON -> "data"
             ExportFormat.ZIP -> "package"
+            ExportFormat.IMAGES -> "images"
         }
         return "$slug-$suffix.${format.ext}"
     }
@@ -111,6 +113,7 @@ class Exporter(private val repo: Repository, private val settings: Settings) {
             ExportFormat.ITEM_CSV -> out.write(itemCsv(data).toByteArray(Charsets.UTF_8))
             ExportFormat.JSON -> out.write(json(data).toByteArray(Charsets.UTF_8))
             ExportFormat.ZIP -> writeZip(data, out)
+            ExportFormat.IMAGES -> writeImagesZip(data, out)
         }
         out.flush()
     }
@@ -552,6 +555,25 @@ class Exporter(private val repo: Repository, private val settings: Settings) {
     }
 
     // ------------------------------------------------------------------ ZIP
+
+    /** Just the page images, filed by box/folder, for bulk download. */
+    private fun writeImagesZip(d: ExportData, out: OutputStream) {
+        fun pad(n: Int, w: Int) = n.toString().padStart(w, '0')
+        val zip = ZipOutputStream(out)
+        d.folders.forEach { r ->
+            d.docsByFolder[r.folder.id].orEmpty().forEach { dr ->
+                d.pagesByDoc[dr.document.id].orEmpty().forEach { p ->
+                    val f = File(p.imagePath)
+                    if (f.exists()) {
+                        zip.putNextEntry(ZipEntry("box-${pad(r.boxNumber, 2)}/folder-${pad(r.folder.number, 3)}/item-${pad(dr.document.sequence, 3)}-p${pad(p.sequence, 2)}.jpg"))
+                        f.inputStream().use { it.copyTo(zip) }
+                        zip.closeEntry()
+                    }
+                }
+            }
+        }
+        zip.finish()
+    }
 
     private fun writeZip(d: ExportData, out: OutputStream) {
         fun pad(n: Int, w: Int) = n.toString().padStart(w, '0')

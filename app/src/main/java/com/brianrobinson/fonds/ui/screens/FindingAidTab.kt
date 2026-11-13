@@ -356,7 +356,7 @@ fun ExportSheet(
         scope.launch {
             val ok = runCatching {
                 val s = c.settings.current
-                val withPages = format == ExportFormat.ITEM_CSV || format == ExportFormat.JSON || format == ExportFormat.ZIP
+                val withPages = format == ExportFormat.ITEM_CSV || format == ExportFormat.JSON || format == ExportFormat.ZIP || format == ExportFormat.IMAGES
                 val data = c.exporter.load(collection.id, ExportOptions(s.includeItemsInExport, s.includeDraftsInExport), withPages)
                     ?: error("Collection not found")
                 val out = context.contentResolver.openOutputStream(uri) ?: error("Couldn't open the file for writing")
@@ -375,6 +375,7 @@ fun ExportSheet(
         ExportFormat.ITEM_CSV to rememberSaver(ExportFormat.ITEM_CSV.mime) { save(ExportFormat.ITEM_CSV, it) },
         ExportFormat.JSON to rememberSaver(ExportFormat.JSON.mime) { save(ExportFormat.JSON, it) },
         ExportFormat.ZIP to rememberSaver(ExportFormat.ZIP.mime) { save(ExportFormat.ZIP, it) },
+        ExportFormat.IMAGES to rememberSaver(ExportFormat.IMAGES.mime) { save(ExportFormat.IMAGES, it) },
     )
 
     ModalBottomSheet(onDismissRequest = { if (busy == null) onDismiss() }, sheetState = sheet) {
@@ -400,6 +401,11 @@ fun ExportSheet(
             if (ExportFormat.ZIP in formats) {
                 FormatRow(Icons.Outlined.FolderZip, "Send to FondsOS on Mac (ZIP)", "Everything: page images, transcriptions, finding aid and data. Save to Drive or Files, then drop it on FondsOS. Also your backup.", busy == null) {
                     launchers.getValue(ExportFormat.ZIP).launch(c.exporter.suggestedName(collection, ExportFormat.ZIP))
+                }
+            }
+            if (ExportFormat.IMAGES in formats) {
+                FormatRow(Icons.Outlined.FolderZip, "All page images (ZIP)", "Just the scans, as JPEG files filed by box and folder. Bulk download.", busy == null) {
+                    launchers.getValue(ExportFormat.IMAGES).launch(c.exporter.suggestedName(collection, ExportFormat.IMAGES))
                 }
             }
             if (ExportFormat.EAD in formats) {
