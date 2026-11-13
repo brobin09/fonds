@@ -1,8 +1,11 @@
 import json, zipfile, sys, io
-from PIL import Image, ImageDraw
+import zlib, struct
 out = sys.argv[1]
 def img(label, c):
-    im = Image.new('RGB', (600, 780), c); d = ImageDraw.Draw(im); d.text((40, 40), label, fill=(30, 30, 30)); b = io.BytesIO(); im.save(b, 'JPEG'); return b.getvalue()
+    w, h = 60, 78
+    raw = b''.join(b'\x00' + bytes(c) * w for _ in range(h))
+    def chunk(t, d): return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
 def item(seq, title, date, creator, recipient, pages, **kw):
     d = dict(sequence=seq, title=title, date=date, dateSort=date, type='Letter', creator=creator, recipient=recipient, summary=kw.get('summary', ''),
              people=kw.get('people', []), places=kw.get('places', []), organizations=[], subjects=kw.get('subjects', []), handwritten=False, reviewed=kw.get('reviewed', False),
