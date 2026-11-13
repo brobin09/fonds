@@ -112,6 +112,7 @@
         state.tab === 'browse' ? [
           h('input', { id: 'filter', type: 'search', placeholder: 'Filter items…', value: state.filter, style: 'width:200px', oninput: (e) => { state.filter = e.target.value; renderBody(); } }),
           h('button', { onclick: toggleView, title: '⌘G' }, state.view === 'gallery' ? 'List' : 'Gallery')] : null,
+        h('button', { onclick: () => dlImages({}) }, 'Download images…'),
         h('button', { onclick: () => window.fonds.reveal(state.id) }, 'Show in Finder')));
     main.append(head, h('div', { class: 'body', id: 'body' }));
     renderBody();
@@ -136,7 +137,7 @@
       const sec = h('div', { class: 'group' });
       if (g.series) sec.append(h('h2', {}, `Series ${roman(g.series.number)}. ${g.series.title}`), g.series.scopeNote ? h('p', { class: 'scope' }, g.series.scopeNote) : null);
       for (const { f, items } of folders) {
-        sec.append(h('div', { class: 'folder' }, h('span', { class: 'tag' }, `Box ${f.box} · Folder ${f.folder}`), h('b', {}, fTitle(f)), h('small', {}, [f.dates, `${f.items.length} items`].filter(Boolean).join(' · '))));
+        sec.append(h('div', { class: 'folder' }, h('span', { class: 'tag' }, `Box ${f.box} · Folder ${f.folder}`), h('b', {}, fTitle(f)), h('small', {}, [f.dates, `${f.items.length} items`].filter(Boolean).join(' · ')), h('button', { class: 'ghost', style: 'margin-left:auto;font-size:12px', onclick: () => dlImages({ box: f.box, folder: f.folder }) }, 'Download images')));
         if (f.scopeNote && !state.filter) sec.append(h('div', { class: 'scope', style: 'color:var(--slate);font-size:13px;margin-bottom:6px' }, f.scopeNote));
         sec.append(state.view === 'gallery' ? gallery(f, items) : list(f, items));
       }
@@ -217,6 +218,11 @@
     if (!keepView) render();
   }
 
+  async function dlImages(filter) {
+    const n = await window.fonds.exportImages(state.id, filter);
+    if (n != null) toast(n ? `Saved ${n} image${n === 1 ? '' : 's'}` : 'No images to save');
+  }
+
   // ------------------------------------------------------------ item detail
 
   const LISTS = new Set(['people', 'places', 'organizations', 'subjects']);
@@ -270,6 +276,9 @@
       key('note', 'Processing note', true),
       h('label', {}, 'Citation'), h('div', { class: 'cite', id: 'cite' }, '…'),
       h('div', { style: 'margin-top:6px' }, h('button', { onclick: async () => { await navigator.clipboard.writeText($('#cite').textContent); toast('Citation copied'); } }, 'Copy citation')),
+      h('div', { style: 'margin-top:8px;display:flex;gap:6px;flex-wrap:wrap' },
+        pg && pg.imagePath ? h('button', { onclick: async () => { const p = await window.fonds.savePage(pg.imagePath, `box${f.box}-folder${f.folder}-item${it.sequence}-p${pg.sequence}.jpg`); if (p) toast('Image saved'); } }, 'Save this page…') : null,
+        it.pages.length > 1 ? h('button', { onclick: () => dlImages({ box: f.box, folder: f.folder, seq: it.sequence }) }, `Save all ${it.pages.length} pages…`) : null),
       h('label', {}, `Transcription${pg ? ` · page ${pg.sequence}` : ''}`),
       h('div', { class: 'transcript' }, (pg && pg.text) || '(no text)'),
       h('div', { style: 'margin-top:6px' }, h('button', { onclick: async () => { await navigator.clipboard.writeText(it.pages.map((p) => p.text || '').join('\n\n')); toast('Transcription copied'); } }, 'Copy all pages'))];

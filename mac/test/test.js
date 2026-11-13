@@ -29,6 +29,13 @@ const c = lib.citation(data, data.folders[0], data.folders[0].items[0]);
 assert(c.includes('Jane Doe to Mary Doe') && c.includes('May 3, 1921') && c.includes('box 1, folder 1'), c);
 assert.equal(lib.search(data, 'train late').length, 1);
 assert.equal(lib.search(data, 'zzz').length, 0);
+// image export
+const dest = path.join(tmp, 'imgs');
+assert.equal(L.exportImages(r.manifest.id, dest), 3);
+assert(fs.existsSync(path.join(dest, 'box-01/folder-001/item-001-p02.jpg')));
+const dest2 = path.join(tmp, 'imgs2');
+assert.equal(L.exportImages(r.manifest.id, dest2, { box: 1, folder: 1, seq: 1 }), 2);
+assert(fs.existsSync(path.join(dest2, 'item-001-p01.jpg')));
 // zip-slip guard
 const AdmZip = require('adm-zip'); const z = new AdmZip(zip); z.addFile('../../evil.txt', Buffer.from('x')); const bad = path.join(tmp, 'bad.zip'); z.writeZip(bad);
 L.importZip(bad); assert(!fs.existsSync(path.join(tmp, 'evil.txt')) && !fs.existsSync(path.join(tmp, 'lib', 'evil.txt')));

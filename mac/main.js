@@ -104,6 +104,18 @@ app.whenReady().then(() => {
     shell.showItemInFolder(r.filePath);
     return r.filePath;
   });
+  ipcMain.handle('img:savePage', async (_e, src, name) => {
+    const r = await dialog.showSaveDialog(win, { defaultPath: name, filters: [{ name: 'JPEG image', extensions: ['jpg'] }] });
+    if (r.canceled) return null;
+    fs.copyFileSync(src, r.filePath); shell.showItemInFolder(r.filePath); return r.filePath;
+  });
+  ipcMain.handle('img:exportAll', async (_e, id, filter) => {
+    const r = await dialog.showOpenDialog(win, { title: 'Choose a folder for the images', properties: ['openDirectory', 'createDirectory'], buttonLabel: 'Save images here' });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const n = library.exportImages(id, r.filePaths[0], filter || {});
+    shell.openPath(r.filePaths[0]);
+    return n;
+  });
   ipcMain.handle('preview', (_e, id, withItems) => { const { data } = library.load(id); return lib.findingAidHtml(data, { items: withItems }); });
   ipcMain.handle('cite', (_e, id, box, folder, seq) => {
     const { data } = library.load(id);

@@ -97,6 +97,28 @@ class Library {
     return this.load(id);
   }
 
+  // Copy page images into destDir keeping box/folder/item structure.
+  // filter: {} = whole collection, {box,folder} = one folder, {box,folder,seq} = one item.
+  exportImages(id, destDir, filter = {}) {
+    const { data } = this.load(id);
+    let n = 0;
+    for (const f of data.folders) {
+      if (filter.box != null && (f.box !== filter.box || f.folder !== filter.folder)) continue;
+      for (const it of f.items) {
+        if (filter.seq != null && it.sequence !== filter.seq) continue;
+        for (const pg of it.pages) {
+          if (!pg.imagePath) continue;
+          const rel = pg.image.replace(/^images\//, '');
+          const target = filter.seq != null ? path.join(destDir, path.basename(rel)) : path.join(destDir, rel);
+          fs.mkdirSync(path.dirname(target), { recursive: true });
+          fs.copyFileSync(pg.imagePath, target);
+          n++;
+        }
+      }
+    }
+    return n;
+  }
+
   remove(id) { fs.rmSync(this.p(id), { recursive: true, force: true }); }
 }
 
