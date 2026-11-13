@@ -1,0 +1,24 @@
+
+> fondsos@1.0.0 dist
+> electron-builder --mac dmg --universal --publish never
+
+  • electron-builder  version=25.1.8 os=25.6.0
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=33.4.11 arch=x64 buildFromSource=false appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=darwin arch=x64 electron=33.4.11 appOutDir=dist/mac-universal-x64-temp
+  • downloading     url=https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-darwin-x64.zip size=104 MB parts=8
+  • downloaded      url=https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-darwin-x64.zip duration=717ms
+  • default Electron icon is used  reason=application icon is not set
+  • executing @electron/rebuild  electronVersion=33.4.11 arch=arm64 buildFromSource=false appDir=./
+  • installing native dependencies  arch=arm64
+  • completed installing native dependencies
+  • packaging       platform=darwin arch=arm64 electron=33.4.11 appOutDir=dist/mac-universal-arm64-temp
+  • downloading     url=https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-darwin-arm64.zip size=100 MB parts=8
+  • downloaded      url=https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-darwin-arm64.zip duration=551ms
+  • packaging       platform=darwin arch=universal electron=33.4.11 appOutDir=dist/mac-universal
+  • skipped macOS code signing  reason=identity explicitly is set to null
+  • building        target=DMG arch=universal file=dist/FondsOS.dmg
+  • Detected arm64 process, HFS+ is unavailable. Creating dmg with APFS - supports Mac OSX 10.12+
+  ⨯ cannot find specified resource "build/icon.icns", nor relative to "/Users/runner/work/fonds/fonds/mac/build", neither relative to project dir ("/Users/runner/work/fonds/fonds/mac")
