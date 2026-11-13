@@ -1,6 +1,6 @@
 {
-  "name": "fonds-for-mac",
-  "productName": "Fonds",
+  "name": "fondsos",
+  "productName": "FondsOS",
   "version": "1.0.0",
   "description": "Companion for the Fonds Android archive scanner: open export packages, browse, edit and print finding aids.",
   "main": "main.js",
@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "com.brianrobinson.fonds.mac",
-    "productName": "Fonds",
+    "productName": "FondsOS",
     "files": ["main.js", "preload.js", "lib.js", "renderer/**", "build/icon.png", "package.json"],
     "directories": { "buildResources": "build", "output": "dist" },
     "mac": {
@@ -34,6 +34,6 @@
         ]
       }
     },
-    "dmg": { "title": "Fonds", "artifactName": "Fonds-mac.dmg" }
+    "dmg": { "title": "FondsOS", "artifactName": "FondsOS.dmg" }
   }
 }

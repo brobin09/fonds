@@ -1,4 +1,4 @@
-name: Build Mac app
+name: Build FondsOS (Mac)
 
 on:
   push:
@@ -30,14 +30,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fonds-mac
-          path: mac/dist/Fonds-mac.dmg
+          path: mac/dist/FondsOS.dmg
       - name: Publish release
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "mac-${{ github.run_number }}" dist/Fonds-mac.dmg \
-            --title "Fonds for Mac #${{ github.run_number }}" --notes "Unsigned. First launch: right-click Fonds → Open (or run: xattr -cr /Applications/Fonds.app)." --latest=false
+          gh release create "mac-${{ github.run_number }}" dist/FondsOS.dmg \
+            --title "FondsOS #${{ github.run_number }}" --notes "Unsigned. First launch: right-click FondsOS → Open (or run: xattr -cr /Applications/FondsOS.app)." --latest=false
       - name: Push log on failure
         if: failure()
         run: |

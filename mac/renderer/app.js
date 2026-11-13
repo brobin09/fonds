@@ -94,7 +94,7 @@
     if (!state.data) {
       main.append(h('div', { class: 'empty' },
         h('div', { class: 'head', style: 'position:absolute;top:0;left:0;right:0;height:44px' }),
-        h('h1', {}, 'Fonds for Mac'),
+        h('h1', {}, 'FondsOS'),
         h('p', {}, 'Your phone scans and describes. This is where you review it on the big screen.'),
         h('ol', {}, h('li', {}, 'On the phone: open a collection → Finding aid → Export → Complete package (ZIP).'),
           h('li', {}, 'Save it to Google Drive, AirDrop it, or email it to yourself.'),

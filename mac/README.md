@@ -1,4 +1,4 @@
-# Fonds for Mac
+# FondsOS (Fonds for Mac)
 
 Companion to the Fonds Android app. Open the **Complete package (ZIP)** exported from the phone, then browse, search, edit, and print finding aids on the Mac.
 
