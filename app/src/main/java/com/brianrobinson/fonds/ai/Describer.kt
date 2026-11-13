@@ -90,13 +90,10 @@ class Describer(
         } else {
             val lines = docs.joinToString("\n") { itemLine(it) }
             val prompt = Prompts.folder(ctx?.title.orEmpty(), row.boxNumber, row.folder.number, row.folder.label, lines.take(7000))
-            val o = DraftParser.extractObject(ask(engine, prompt))
-            if (o != null) {
-                o.optString("title").trim().takeIf { it.isNotBlank() }?.let { drafts[Fields.TITLE] = it }
-                o.optString("scopeNote").trim().takeIf { it.isNotBlank() }?.let { drafts[Fields.SCOPE] = it }
-            } else {
-                drafts += patternFolder(docs)
-            }
+            val answer = DraftParser.parseKeyed(ask(engine, prompt), setOf("TITLE", "SCOPE"))
+            answer["TITLE"]?.takeIf { it.isNotBlank() }?.let { drafts[Fields.TITLE] = it }
+            answer["SCOPE"]?.takeIf { it.isNotBlank() }?.let { drafts[Fields.SCOPE] = it }
+            if (answer.values.all { it.isBlank() }) drafts += patternFolder(docs)
         }
         val f = row.folder
         val changed = drafts.filter { (k, v) ->
@@ -140,25 +137,32 @@ class Describer(
         val docs = dao.allDocumentRows(collectionId).groupBy { it.document.folderId }
         val engine = pick()
         if (engine != Pipeline.PATTERN) {
+            // Keep each folder line short: Nano reads ~4,000 tokens and answers in 256.
             val lines = folders.joinToString("\n") { f ->
                 val title = f.folder.displayTitle().ifBlank { patternFolder(docs[f.folder.id].orEmpty())[Fields.TITLE].orEmpty() }
-                val scope = f.folder.scopeNote.ifBlank { Proposals.parse(f.folder.proposals)[Fields.SCOPE].orEmpty() }
-                "[${f.folder.id}] Box ${f.boxNumber}/Folder ${f.folder.number}: ${title.ifBlank { "untitled" }}" +
-                    if (scope.isNotBlank()) " — $scope" else ""
+                "[${f.folder.id}] Box ${f.boxNumber}/Folder ${f.folder.number}: ${title.ifBlank { "untitled" }.take(80)}"
             }
-            val raw = ask(engine, Prompts.series(c.title, lines.take(7000)))
-            val arr = DraftParser.extractArray(raw)
-            if (arr != null) {
-                val valid = folders.map { it.folder.id }.toSet()
-                val used = mutableSetOf<Long>()
-                val out = (0 until arr.length()).mapNotNull { i ->
-                    val o = arr.optJSONObject(i) ?: return@mapNotNull null
-                    val ids = o.optJSONArray("folders")?.let { a -> (0 until a.length()).map { a.optLong(it) } }.orEmpty()
-                        .filter { it in valid && used.add(it) }
-                    val title = o.optString("title").trim()
-                    if (title.isBlank() || ids.isEmpty()) null else SeriesSuggestion(title, o.optString("scopeNote").trim(), ids)
+            val raw = ask(engine, Prompts.series(c.title, lines.take(7000), withScope = engine == Engine.CLAUDE))
+            val valid = folders.map { it.folder.id }.toSet()
+            val used = mutableSetOf<Long>()
+            val out = raw.replace("```", "").lines().mapNotNull { line ->
+                val parts = line.split("|").map { it.trim() }
+                if (parts.size < 2) return@mapNotNull null
+                val title = parts[0].trim('-', '*', '•', ' ').replace(Regex("""^(series\s+[ivxlcdm\d]+[.:]\s*)""", RegexOption.IGNORE_CASE), "").trim()
+                val ids = Regex("""\d+""").findAll(parts[1]).mapNotNull { it.value.toLongOrNull() }
+                    .filter { it in valid && used.add(it) }.toList()
+                if (title.isBlank() || ids.isEmpty()) null else SeriesSuggestion(title, parts.getOrNull(2).orEmpty(), ids)
+            }
+            if (out.isNotEmpty()) {
+                // Anything the model didn't place (e.g. a long list cut short) is grouped by document type.
+                val leftover = folders.filter { it.folder.id !in used }
+                val extra = if (leftover.isEmpty()) emptyList() else patternSeries(leftover, docs)
+                val merged = out.toMutableList()
+                extra.forEach { e ->
+                    val i = merged.indexOfFirst { it.title.equals(e.title, ignoreCase = true) }
+                    if (i >= 0) merged[i] = merged[i].copy(folderIds = merged[i].folderIds + e.folderIds) else merged += e
                 }
-                if (out.isNotEmpty()) return out to DraftOutcome(engineName(engine))
+                return merged to DraftOutcome(engineName(engine))
             }
         }
         return patternSeries(folders, docs) to DraftOutcome(engineName(Pipeline.PATTERN))
@@ -230,9 +234,12 @@ class Describer(
                 "Box ${f.boxNumber}, Folder ${f.folder.number}: ${title.ifBlank { "untitled" }}" +
                     (if (range.isNotBlank()) ", $range" else "") + (if (scope.isNotBlank()) " — $scope" else "")
             }
-            val o = DraftParser.extractObject(ask(engine, Prompts.collection(c.title, c.creator, dates, extent, lines.take(7000))))
-            o?.optString("abstractText")?.trim()?.takeIf { it.isNotBlank() }?.let { drafts[Fields.ABSTRACT] = it }
-            o?.optString("scopeContent")?.trim()?.takeIf { it.isNotBlank() }?.let { drafts[Fields.SCOPE_CONTENT] = it }
+            // Two short asks so each answer fits Nano's 256-token limit.
+            val folderText = lines.take(6500)
+            DraftParser.plain(ask(engine, Prompts.collectionAbstract(c.title, c.creator, dates, extent, folderText)))
+                .takeIf { it.isNotBlank() && it != c.abstractText }?.let { drafts[Fields.ABSTRACT] = it }
+            DraftParser.plain(ask(engine, Prompts.collectionScope(c.title, c.creator, dates, extent, folderText)))
+                .takeIf { it.isNotBlank() && it != c.scopeContent }?.let { drafts[Fields.SCOPE_CONTENT] = it }
         } else if (folders.isNotEmpty()) {
             val docs = dao.allDocumentRows(collectionId)
             val people = docs.flatMap { d ->

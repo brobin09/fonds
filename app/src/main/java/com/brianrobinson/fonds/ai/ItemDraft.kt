@@ -81,6 +81,84 @@ object DraftParser {
         )
     }
 
+    private val PROSE = setOf("SUMMARY", "SCOPE")
+
+    private val EMPTY = setOf("none", "n/a", "na", "unknown", "not shown", "not stated", "-", "--", "null", "nil", "[]")
+
+    /**
+     * Reads "KEY: value" lines (tolerating bullets, bold markers and different case).
+     * A line without a key continues the previous value, so a wrapped summary isn't lost.
+     */
+    fun parseKeyed(raw: String, keys: Set<String>): Map<String, String> {
+        val out = linkedMapOf<String, String>()
+        var last: String? = null
+        val keyAlt = keys.joinToString("|") { Regex.escape(it) }
+        val line = Regex("""^[\s*\-•#>]*\**\s*($keyAlt)\s*\**\s*[:：]\s*(.*)$""", RegexOption.IGNORE_CASE)
+        raw.replace("```", "").lines().forEach { l ->
+            val m = line.find(l)
+            if (m != null) {
+                val key = keys.first { it.equals(m.groupValues[1], ignoreCase = true) }
+                out[key] = clean(m.groupValues[2])
+                last = key
+            } else if (l.isNotBlank()) {
+                // only prose wraps onto a second line; anything else after the answer is chatter
+                last?.takeIf { it in PROSE }?.let { k -> out[k] = (out[k].orEmpty() + " " + clean(l)).trim() }
+            }
+        }
+        return out.mapValues { (_, v) -> if (v.lowercase().trim('.', ' ') in EMPTY) "" else v }
+    }
+
+    private fun clean(v: String): String =
+        v.trim().trim('*').trim().removeSurrounding("[", "]").removeSurrounding("\"").trim()
+
+    private enum class Split { NAMES, PLACES, TERMS }
+
+    /**
+     * The prompts ask for semicolons. If a model uses commas anyway: places stay whole
+     * ("Durham, North Carolina"), "Smith, John" stays one name, and other lists split.
+     */
+    private fun splitList(v: String, kind: Split): List<String> {
+        if (v.isBlank()) return emptyList()
+        val parts = when {
+            ';' in v -> v.split(';')
+            ',' !in v || kind == Split.PLACES -> listOf(v)
+            kind == Split.NAMES -> {
+                val c = v.split(',')
+                if (c.size == 2 && c[0].trim().none { it == ' ' }) listOf(v) else c
+            }
+            else -> v.split(',')
+        }
+        return parts.map { it.trim().trim('.').trim() }.filter { it.isNotEmpty() && it.lowercase() !in EMPTY }
+    }
+
+    private val ITEM_KEYS = setOf("TITLE", "DATE", "SORT", "TYPE", "FROM", "TO", "SUMMARY", "PEOPLE", "PLACES", "ORGANIZATIONS", "SUBJECTS")
+
+    /** Item description from labeled lines (Gemini Nano's format). Falls back to JSON. */
+    fun parseItemLines(raw: String): ItemDraft? {
+        val m = parseKeyed(raw, ITEM_KEYS)
+        if (m.values.none { it.isNotBlank() }) return parseItem(raw)
+        val date = m["DATE"].orEmpty()
+        return ItemDraft(
+            title = m["TITLE"].orEmpty(),
+            date = date,
+            dateSort = normalizeSort(m["SORT"].orEmpty()).ifBlank { com.brianrobinson.fonds.data.Dates.sortFromDacs(date) },
+            docType = m["TYPE"].orEmpty().let { t -> Prompts.TYPES.firstOrNull { it.equals(t, ignoreCase = true) } ?: t },
+            creator = m["FROM"].orEmpty(),
+            recipient = m["TO"].orEmpty(),
+            summary = m["SUMMARY"].orEmpty(),
+            people = splitList(m["PEOPLE"].orEmpty(), Split.NAMES),
+            places = splitList(m["PLACES"].orEmpty(), Split.PLACES),
+            organizations = splitList(m["ORGANIZATIONS"].orEmpty(), Split.TERMS),
+            subjects = splitList(m["SUBJECTS"].orEmpty(), Split.TERMS),
+        )
+    }
+
+    /** Plain-text answers: drop a leading label like "Abstract:" and surrounding quotes. */
+    fun plain(raw: String): String =
+        raw.replace("```", "").trim()
+            .replace(Regex("""^\**\s*(abstract|scope and content|scope|note)\s*\**\s*:\s*""", RegexOption.IGNORE_CASE), "")
+            .trim().removeSurrounding("\"").trim()
+
     fun normalizeSort(s: String): String {
         val m = Regex("""^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?""").find(s.trim()) ?: return ""
         val y = m.groupValues[1]

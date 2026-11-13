@@ -56,6 +56,12 @@ class Pipeline(
             dao.resetReading()
             dao.resetDescribing()
             runCatching { nano.refresh() }
+            if (!settings.current.nanoLimitFixApplied) {
+                // Earlier builds asked Nano for more than its 256-token maximum, so those items fell
+                // back to pattern matching or errored. Give them a proper on-device draft now.
+                dao.requeueNanoFailures()
+                settings.update { it.copy(nanoLimitFixApplied = true) }
+            }
             loop()
         }
     }
@@ -222,18 +228,21 @@ class Pipeline(
         }
     }
 
+    /**
+     * Gemini Nano answers in 256 tokens at most, so an item is described in two short asks
+     * (title/date/type/people-in-the-letterhead, then summary and names) and the answers merged.
+     */
     private suspend fun describeWithNano(context: String, pages: List<PageEntity>, text: String): ItemDraft {
         if (!nano.isAvailable) nano.refresh()
         if (!nano.isAvailable) throw IllegalStateException("Gemini Nano isn't ready on this phone yet. Check Settings.")
         awaitForeground()
         val clipped = text.take(NanoEngine.MAX_TEXT_CHARS)
-        val raw = if (clipped.length < 120 && pages.isNotEmpty()) {
-            val bmp = ImageStore.decodeScaled(pages.first().imagePath, 896)
-            nano.generate(Prompts.itemFromImagesOnly(context), bmp)
-        } else {
-            nano.generate(Prompts.item(context, clipped))
-        }
-        return DraftParser.parseItem(raw)
+        val bmp = if (clipped.length < 120 && pages.isNotEmpty()) ImageStore.decodeScaled(pages.first().imagePath, 896) else null
+        val docText = if (bmp != null) null else clipped
+        val basics = nano.generate(Prompts.nanoBasics(context, docText), bmp)
+        awaitForeground()
+        val contents = nano.generate(Prompts.nanoContents(context, docText), bmp)
+        return DraftParser.parseItemLines(basics + "\n" + contents)
             ?: throw IllegalStateException("The on-device model didn't return a usable description.")
     }
 

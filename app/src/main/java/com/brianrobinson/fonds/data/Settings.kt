@@ -30,6 +30,7 @@ data class SettingsState(
     val lastSourceRepository: String = "",
     val lastSourceCollection: String = "",
     val lastSourceLocation: String = "",
+    val nanoLimitFixApplied: Boolean = false,
 ) {
     val hasClaude: Boolean get() = claudeKey.isNotBlank()
 }
@@ -67,6 +68,7 @@ class Settings(context: Context) {
             lastSourceRepository = prefs.getString("lastSourceRepository", "") ?: "",
             lastSourceCollection = prefs.getString("lastSourceCollection", "") ?: "",
             lastSourceLocation = prefs.getString("lastSourceLocation", "") ?: "",
+            nanoLimitFixApplied = prefs.getBoolean("nanoLimitFixApplied", false),
         )
     }
 
@@ -89,6 +91,7 @@ class Settings(context: Context) {
             .putString("lastSourceRepository", s.lastSourceRepository)
             .putString("lastSourceCollection", s.lastSourceCollection)
             .putString("lastSourceLocation", s.lastSourceLocation)
+            .putBoolean("nanoLimitFixApplied", s.nanoLimitFixApplied)
             .apply()
     }
 }

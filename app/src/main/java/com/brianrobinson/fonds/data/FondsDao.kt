@@ -267,6 +267,13 @@ interface FondsDao {
     fun busyCount(): Flow<Int>
 
     @Query(
+        """UPDATE documents SET status = 'read', statusDetail = '' WHERE reviewed = 0 AND (
+           (status IN ('drafted','done') AND engine LIKE 'Pattern match (on-device AI failed)%')
+           OR (status = 'error' AND statusDetail LIKE '%maxOutputTokens%'))""",
+    )
+    suspend fun requeueNanoFailures(): Int
+
+    @Query(
         """SELECT d.id AS documentId, f.id AS folderId, f.number AS folderNumber, f.label AS folderLabel,
            f.title AS folderTitle, b.id AS boxId, b.number AS boxNumber, c.id AS collectionId,
            c.title AS collectionTitle, c.repository AS repository, c.kind AS collectionKind

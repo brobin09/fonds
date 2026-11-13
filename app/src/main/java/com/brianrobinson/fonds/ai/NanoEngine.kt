@@ -70,18 +70,20 @@ class NanoEngine {
         refresh()
     }
 
-    suspend fun generate(prompt: String, image: Bitmap? = null): String {
+    /** Gemini Nano writes at most [MAX_OUTPUT_TOKENS] tokens per answer, so callers keep each ask small. */
+    suspend fun generate(prompt: String, image: Bitmap? = null, maxTokens: Int = MAX_OUTPUT_TOKENS): String {
+        val limit = maxTokens.coerceIn(1, MAX_OUTPUT_TOKENS)
         val request = if (image != null) {
             generateContentRequest(ImagePart(image), TextPart(prompt)) {
                 temperature = 0.2f
                 topK = 16
-                maxOutputTokens = 600
+                maxOutputTokens = limit
             }
         } else {
             generateContentRequest(TextPart(prompt)) {
                 temperature = 0.2f
                 topK = 16
-                maxOutputTokens = 600
+                maxOutputTokens = limit
             }
         }
         val response = model.generateContent(request)
@@ -89,7 +91,10 @@ class NanoEngine {
     }
 
     companion object {
-        /** Nano accepts under ~4,000 tokens; keep the document text well inside that. */
+        /** Nano accepts under ~4,000 tokens of input; keep the document text well inside that. */
         const val MAX_TEXT_CHARS = 8_000
+
+        /** Hard ceiling set by the on-device model. */
+        const val MAX_OUTPUT_TOKENS = 256
     }
 }
