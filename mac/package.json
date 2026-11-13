@@ -26,12 +26,11 @@
       "preload.js",
       "lib.js",
       "renderer/**",
-      "build/icon.png",
       "package.json",
-      "build/icon.png"
+      "assets/icon.png"
     ],
     "directories": {
-      "buildResources": "build",
+      "buildResources": "assets",
       "output": "dist"
     },
     "mac": {
@@ -45,7 +44,7 @@
         }
       ],
       "identity": null,
-      "icon": "build/icon.icns",
+      "icon": "assets/icon.icns",
       "extendInfo": {
         "CFBundleDocumentTypes": [
           {
@@ -62,7 +61,7 @@
     "dmg": {
       "title": "FondsOS",
       "artifactName": "FondsOS.dmg",
-      "icon": "build/icon.icns"
+      "icon": "assets/icon.icns"
     }
   }
 }

@@ -48,7 +48,7 @@ function menu() {
 app.whenReady().then(() => {
   library = new lib.Library(path.join(app.getPath('userData'), 'library'));
   menu();
-  try { if (process.platform === 'darwin' && app.dock) app.dock.setIcon(path.join(__dirname, 'build', 'icon.png')); } catch (_) { /* packaged app uses the bundle icon */ }
+  try { if (process.platform === 'darwin' && app.dock) app.dock.setIcon(path.join(__dirname, 'assets', 'icon.png')); } catch (_) { /* packaged app uses the bundle icon */ }
 
   ipcMain.handle('library:list', () => library.list());
   ipcMain.handle('library:pick', async () => {
