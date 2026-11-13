@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MoreVert
@@ -91,6 +92,7 @@ fun CollectionScreen(nav: Nav, collectionId: Long, initialTab: Int) {
     val settings by c.settings.state.collectAsStateWithLifecycle()
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var exportOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val s = summary
 
@@ -115,6 +117,7 @@ fun CollectionScreen(nav: Nav, collectionId: Long, initialTab: Int) {
                         if (tab == 0) {
                             ViewToggle(settings.galleryView) { c.settings.update { it.copy(galleryView = !it.galleryView) } }
                         }
+                        IconButton(onClick = { exportOpen = true }) { Icon(Icons.Outlined.FileDownload, "Export / send to Mac") }
                         IconButton(onClick = { nav.go(Routes.search(collectionId)) }) { Icon(Icons.Outlined.Search, "Search this collection") }
                         IconButton(onClick = { nav.go(Routes.details(collectionId)) }) { Icon(Icons.Outlined.Info, "Collection details") }
                         Box {
@@ -170,6 +173,11 @@ fun CollectionScreen(nav: Nav, collectionId: Long, initialTab: Int) {
                 else -> FindingAidTab(collectionId, nav)
             }
         }
+    }
+
+    if (exportOpen) {
+        val col = s?.collection
+        if (col != null) ExportSheet(collection = col, onDismiss = { exportOpen = false }, onSaved = { exportOpen = false })
     }
 
     if (confirmDelete) {

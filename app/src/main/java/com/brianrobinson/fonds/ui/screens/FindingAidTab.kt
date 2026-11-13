@@ -397,6 +397,11 @@ fun ExportSheet(
                 Text("Preparing ${busy?.label}…", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(vertical = 6.dp))
             }
             failure?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 6.dp)) }
+            if (ExportFormat.ZIP in formats) {
+                FormatRow(Icons.Outlined.FolderZip, "Send to FondsOS on Mac (ZIP)", "Everything: page images, transcriptions, finding aid and data. Save to Drive or Files, then drop it on FondsOS. Also your backup.", busy == null) {
+                    launchers.getValue(ExportFormat.ZIP).launch(c.exporter.suggestedName(collection, ExportFormat.ZIP))
+                }
+            }
             if (ExportFormat.EAD in formats) {
                 FormatRow(Icons.Outlined.Code, "EAD 2002 XML", "Standard encoded finding aid. Imports into ArchivesSpace and most catalogs.", busy == null) {
                     launchers.getValue(ExportFormat.EAD).launch(c.exporter.suggestedName(collection, ExportFormat.EAD))
@@ -420,11 +425,6 @@ fun ExportSheet(
             if (ExportFormat.JSON in formats) {
                 FormatRow(Icons.Outlined.DataObject, "Data (JSON)", "Everything Fonds knows, for other tools or your own scripts.", busy == null) {
                     launchers.getValue(ExportFormat.JSON).launch(c.exporter.suggestedName(collection, ExportFormat.JSON))
-                }
-            }
-            if (ExportFormat.ZIP in formats) {
-                FormatRow(Icons.Outlined.FolderZip, "Complete package (ZIP)", "All of the above plus every page image and transcription. Use this as your backup.", busy == null) {
-                    launchers.getValue(ExportFormat.ZIP).launch(c.exporter.suggestedName(collection, ExportFormat.ZIP))
                 }
             }
         }
